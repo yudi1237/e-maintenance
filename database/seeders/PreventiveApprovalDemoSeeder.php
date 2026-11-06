@@ -153,6 +153,13 @@ class PreventiveApprovalDemoSeeder extends Seeder
                 'readings' => $readings === [] ? null : $readings,
                 'result' => $row['result'],
                 'status' => $row['status'],
+                'item_remarks' => ($key = array_key_first($items)) === null ? null : [$key => 'Catatan demo approval.'],
+                'injection_approved_by' => in_array($row['status'], [PreventiveStatus::APPROVE_PRODUKSI_INJECTION, PreventiveStatus::CLOSE], true)
+                    ? User::query()->where('role', User::ROLE_PRODUKSI_INJECTION)->orderBy('id')->value('id')
+                    : null,
+                'maintenance_approved_by' => $row['status'] === PreventiveStatus::CLOSE
+                    ? User::query()->where('role', User::ROLE_ADMIN)->orderBy('id')->value('id')
+                    : null,
             ]
         );
     }

@@ -61,19 +61,29 @@
         <tr>
             @foreach ($steps as $step)
                 @php
+                    $approverName = null;
+                    if ($step['done'] && $report) {
+                        $approver = match ($step['key']) {
+                            'approve_produksi_injection' => $report->injectionApprover ?? null,
+                            'approve_quality' => $report->qualityApprover ?? null,
+                            'close' => $report->maintenanceApprover ?? null,
+                            default => null,
+                        };
+                        $approverName = $approver?->name;
+                    }
                     $title = $step['done']
-                        ? $step['label'].' sudah approve'
+                        ? ($approverName ? $approverName.' sudah approve' : $step['label'].' sudah approve')
                         : ($step['current'] ? 'Menunggu approve '.$step['label'] : 'Belum '.$step['label']);
                 @endphp
-                <td class="{{ $compact ? 'px-1 py-2' : 'px-3 py-3' }}" title="{{ $title }}">
+                <td class="{{ $compact ? 'px-1 py-2' : 'px-3 py-3' }}">
                     @if ($step['done'])
-                        <span class="em-approval-mark em-approve-done" aria-label="{{ $step['label'] }} sudah approve">
+                        <span class="em-approval-mark em-approve-done" title="{{ $title }}" aria-label="{{ $title }}">
                             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                             </svg>
                         </span>
                     @else
-                        <span class="em-approval-mark em-approve-loading" aria-label="{{ $title }}">
+                        <span class="em-approval-mark em-approve-loading" title="{{ $title }}" aria-label="{{ $title }}">
                             <svg class="em-approve-spinner" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                                 <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity="0.25"/>
                                 <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>

@@ -14,6 +14,7 @@ class PreventiveReportXlsxExport
         $exporter->setSheetName($this->sheetName($report));
         $readings = $report->readings ?? [];
         $answers = $report->items ?? [];
+        $remarks = $report->item_remarks ?? [];
 
         $exporter->addRow(['Mesin', $report->machine_number]);
         $exporter->addRow(['Nama Mesin', $report->machine_name_display]);
@@ -21,6 +22,7 @@ class PreventiveReportXlsxExport
         $exporter->addRow(['Tipe Preventive', $report->category_label]);
         $exporter->addRow(['Tanggal', $report->work_date?->format('d/m/Y')]);
         $exporter->addRow(['Shift', $report->work_shift_label]);
+        $exporter->addRow(['Anggota Tim', $report->team_members_label]);
         $exporter->addRow(['PIC', $report->pic_name]);
         $exporter->addRow(['Hasil', $report->result_label]);
         $exporter->addRow(['Status Approval', $report->status_label]);
@@ -30,7 +32,7 @@ class PreventiveReportXlsxExport
         $exporter->addRow(['Catatan', $report->notes]);
         $exporter->addRow(['Evidence', implode("\n", $report->evidence_urls)]);
         $exporter->addRow([]);
-        $exporter->addRow(['Grup', 'No', 'Item Pemeriksaan', 'Standar', 'Isi Manual', 'Hasil']);
+        $exporter->addRow(['Grup', 'No', 'Item Pemeriksaan', 'Standar', 'Isi Manual', 'Hasil', 'Remarks']);
 
         foreach ($report->checklistGroups() as $group) {
             $groupLabel = (string) ($group['label'] ?? '');
@@ -66,6 +68,7 @@ class PreventiveReportXlsxExport
                     $standard !== '' ? $standard : '—',
                     $manual !== '' ? $manual : '—',
                     $result,
+                    filled($remarks[$key] ?? null) ? (string) $remarks[$key] : '—',
                 ]);
                 $no++;
             }

@@ -5,12 +5,14 @@ namespace Database\Seeders;
 use App\Models\DamageCategory;
 use App\Models\FindingRecap;
 use App\Models\MachineName;
+use App\Models\MachineRunDay;
 use App\Models\MaintenanceReport;
 use App\Models\OperatorReport;
 use App\Models\PreventiveReport;
 use App\Models\Robot;
 use App\Models\Technician;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
 use App\Support\FindingRecapStatus;
 use App\Support\PreventiveChecklist;
 use App\Support\PreventiveMachineChecklist;
@@ -66,6 +68,7 @@ class DemoDashboardSeeder extends Seeder
         $this->seedSparepartHistoryDummy();
         $this->seedPreventive($today, $technicianUser, $andi, $budi, $cici);
         $this->seedFindingRecaps($today, $admin);
+        $this->seedDashboardExtras($today, $admin);
     }
 
     public function seedSparepartHistoryDummy(): void
@@ -330,6 +333,7 @@ class DemoDashboardSeeder extends Seeder
         ];
 
         foreach ($tickets as $row) {
+            $row = $this->withWalkthroughFields($row, $technicianUser, $andi, $budi, $cici);
             $this->upsertTicket($today, $technicianUser, $row);
         }
     }
@@ -563,9 +567,14 @@ class DemoDashboardSeeder extends Seeder
                 'tindakan_perbaikan_2' => null,
                 'penggunaan_sparepart' => $row['sparepart'] ?? null,
                 'sparepart_items' => $row['sparepart_items'] ?? null,
+                'yang_mengerjakan' => $row['workers'] ?? null,
+                'damage_cause_category' => $row['damage_cause'] ?? null,
+                'line_stop_mesin' => $row['line_stop'] ?? null,
+                'sub_damage_category_id' => $row['sub_category_id'] ?? null,
                 'ada_op' => true,
                 'status_perbaikan' => $row['status'],
                 'step2_completed_at' => $step2At,
+                ...$this->repairApprovers((string) $row['status']),
             ]
         );
     }
@@ -599,6 +608,8 @@ class DemoDashboardSeeder extends Seeder
                 ? Robot::query()->where('robot_number', sprintf('R%02d', $row['machine_number']))->first()
                     ?? Robot::query()->active()->orderBy('robot_number')->first()
                 : null;
+            $remarkKey = array_key_first($items);
+            $withEvidence = $row['machine_number'] === 20 && $row['category'] === 'PM1';
 
             PreventiveReport::query()->updateOrCreate(
                 [
@@ -617,12 +628,145 @@ class DemoDashboardSeeder extends Seeder
                     'work_shift' => WorkShift::SHIFT_2,
                     'items' => $items,
                     'readings' => $readings === [] ? null : $readings,
+                    'item_remarks' => $remarkKey === null ? null : [$remarkKey => 'Catatan demo teknisi pada item ini.'],
                     'notes' => $row['notes'],
+                    'evidence_paths' => $withEvidence ? array_filter([$this->demoEvidencePath()]) : null,
                     'result' => $row['result'],
                     'status' => $row['status'],
+                    ...$this->preventiveApprovers((string) $row['status']),
                 ]
             );
         }
+    }
+
+    /**
+     * @return array{injection_approved_by: int|null, quality_approved_by: int|null, maintenance_approved_by: int|null}
+     */
+    private function repairApprovers(string $status): array
+    {
+        $doneInjection = in_array($status, [
+            RepairStatus::APPROVE_PRODUKSI_INJECTION,
+            RepairStatus::APPROVE_QUALITY,
+            RepairStatus::CLOSE,
+        ], true);
+
+        return [
+            'injection_approved_by' => $doneInjection ? $this->userId(User::ROLE_PRODUKSI_INJECTION) : null,
+            'quality_approved_by' => in_array($status, [RepairStatus::APPROVE_QUALITY, RepairStatus::CLOSE], true)
+                ? $this->userId(User::ROLE_QUALITY)
+                : null,
+            'maintenance_approved_by' => $status === RepairStatus::CLOSE ? $this->userId(User::ROLE_ADMIN) : null,
+        ];
+    }
+
+    /**
+     * @return array{injection_approved_by: int|null, maintenance_approved_by: int|null}
+     */
+    private function preventiveApprovers(string $status): array
+    {
+        $doneInjection = in_array($status, [
+            PreventiveStatus::APPROVE_PRODUKSI_INJECTION,
+            PreventiveStatus::CLOSE,
+        ], true);
+
+        return [
+            'injection_approved_by' => $doneInjection ? $this->userId(User::ROLE_PRODUKSI_INJECTION) : null,
+            'maintenance_approved_by' => $status === PreventiveStatus::CLOSE ? $this->userId(User::ROLE_ADMIN) : null,
+        ];
+    }
+
+    private function userId(string $role): ?int
+    {
+        $id = User::query()->where('role', $role)->orderBy('id')->value('id');
+
+        return $id === null ? null : (int) $id;
+    }
+
+    private function demoEvidencePath(): ?string
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            return null;
+        }
+
+        $image = imagecreatetruecolor(480, 270);
+        if ($image === false) {
+            return null;
+        }
+
+        $background = imagecolorallocate($image, 15, 118, 110);
+        $white = imagecolorallocate($image, 255, 255, 255);
+        imagefilledrectangle($image, 0, 0, 479, 269, $background);
+        imagestring($image, 5, 150, 120, 'Demo Evidence PM', $white);
+        ob_start();
+        imagejpeg($image, null, 80);
+        $jpeg = ob_get_clean();
+        imagedestroy($image);
+
+        if (! is_string($jpeg) || $jpeg === '') {
+            return null;
+        }
+
+        $path = 'preventive-evidence/demo-lampiran.jpg';
+        Storage::disk('public')->put($path, $jpeg);
+
+        return $path;
+    }
+
+    private function seedDashboardExtras(Carbon $today, User $admin): void
+    {
+        $options = array_keys(MachineName::severityOptions());
+        $numbers = [1, 3, 4, 5, 7, 8, 9, 11, 12, 15, 18, 22];
+
+        foreach ($numbers as $index => $number) {
+            $machine = MachineName::query()->where('machine_number', $number)->first();
+            if ($machine === null) {
+                continue;
+            }
+
+            $current = $machine->severity_conditions;
+            if (! is_array($current) || $current === []) {
+                $machine->update([
+                    'severity_conditions' => [$options[$index % count($options)]],
+                ]);
+            }
+        }
+
+        $runnerId = $this->userId(User::ROLE_PRODUKSI_INJECTION) ?? $admin->id;
+        $day = $today->toDateString();
+        foreach ([3, 7] as $number) {
+            $this->markMachineDay($number, MachineRunDay::STATUS_RUNNING, $runnerId, $day);
+        }
+        foreach ([16, 21] as $number) {
+            $this->markMachineDay($number, MachineRunDay::STATUS_BREAKDOWN, $runnerId, $day);
+        }
+    }
+
+    private function markMachineDay(int $number, string $status, int $userId, string $day): void
+    {
+        if (MachineName::query()->where('machine_number', $number)->doesntExist()) {
+            return;
+        }
+
+        $existing = MachineRunDay::query()
+            ->where('machine_number', $number)
+            ->whereDate('run_date', $day)
+            ->first();
+
+        if ($existing) {
+            $existing->update([
+                'status' => $status,
+                'user_id' => $userId,
+            ]);
+
+            return;
+        }
+
+        MachineRunDay::query()->create([
+            'machine_number' => $number,
+            'run_date' => $day,
+            'status' => $status,
+            'user_id' => $userId,
+        ]);
     }
 
     private function seedFindingRecaps(Carbon $today, User $admin): void
@@ -705,6 +849,57 @@ class DemoDashboardSeeder extends Seeder
                 $recap->addStatusNote($status, $note, $admin->id);
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function withWalkthroughFields(array $row, User $technicianUser, Technician $andi, Technician $budi, Technician $cici): array
+    {
+        if (($row['npk'] ?? '') === '880005') {
+            $row['workers'] = [
+                'mode' => 'team',
+                'technician_ids' => [$andi->id, $budi->id],
+                'names' => [$andi->optionLabel(), $budi->optionLabel()],
+            ];
+            $row['line_stop'] = true;
+            $row['damage_cause'] = 'hydraulic_problem';
+            $row['sub_category_id'] = $row['category_id'] ?? null;
+        }
+
+        if (($row['npk'] ?? '') === '880006') {
+            $row['workers'] = [
+                'mode' => 'team',
+                'technician_ids' => [$budi->id, $cici->id],
+                'names' => [$budi->optionLabel(), $cici->optionLabel()],
+            ];
+            $row['line_stop'] = false;
+            $row['damage_cause'] = 'component_failure';
+            $row['sub_category_id'] = $row['category_id'] ?? null;
+        }
+
+        if (($row['npk'] ?? '') === '880009') {
+            $row['workers'] = [
+                'mode' => 'self',
+                'names' => [$technicianUser->name],
+            ];
+            $row['line_stop'] = false;
+            $row['damage_cause'] = 'component_failure';
+            $row['sub_category_id'] = $row['category_id'] ?? null;
+        }
+
+        if (($row['npk'] ?? '') === '880007') {
+            $row['workers'] = [
+                'mode' => 'self',
+                'names' => [$andi->name],
+            ];
+            $row['line_stop'] = true;
+            $row['damage_cause'] = 'human_error';
+            $row['sub_category_id'] = $row['category_id'] ?? null;
+        }
+
+        return $row;
     }
 
     private function machine(int $number): ?MachineName

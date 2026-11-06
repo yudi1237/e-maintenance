@@ -26,7 +26,7 @@ class StoreOperatorReportRequest extends FormRequest
     {
         $cleaned = [];
 
-        foreach (['operator_name', 'npk', 'item_name', 'problem', 'chronology'] as $field) {
+        foreach (['operator_name', 'item_name', 'problem', 'chronology'] as $field) {
             $value = $this->input($field);
             if (! is_string($value)) {
                 continue;
@@ -53,7 +53,6 @@ class StoreOperatorReportRequest extends FormRequest
     {
         return [
             'operator_name' => ['required', 'string', 'max:150', 'regex:/^[\p{L}\p{M} .\'\-]+$/u', new SafePlainText],
-            'npk' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z0-9]+$/'],
             'item_name' => ['required', 'string', 'max:200', 'regex:/^[\p{L}\p{M}0-9 .,\-\/()]+$/u', new SafePlainText],
             'stop_date' => ['required', 'date', 'date_format:Y-m-d'],
             'stop_time' => ['required', 'date_format:H:i'],
@@ -66,8 +65,7 @@ class StoreOperatorReportRequest extends FormRequest
     {
         return [
             'operator_name' => 'Nama',
-            'npk' => 'NPK',
-            'item_name' => 'Nama Barang',
+            'item_name' => 'Nama Part',
             'stop_date' => 'Stop Tanggal',
             'stop_time' => 'Jam',
             'problem' => 'Masalah',
@@ -79,14 +77,12 @@ class StoreOperatorReportRequest extends FormRequest
     {
         return [
             'operator_name.required' => 'Nama wajib diisi.',
-            'npk.required' => 'NPK wajib diisi.',
-            'item_name.required' => 'Nama Barang wajib diisi.',
+            'item_name.required' => 'Nama Part wajib diisi.',
             'stop_date.required' => 'Stop Tanggal wajib diisi.',
             'stop_time.required' => 'Jam wajib diisi.',
             'problem.required' => 'Masalah wajib diisi.',
             'operator_name.regex' => 'Nama hanya boleh huruf dan spasi.',
-            'npk.regex' => 'NPK hanya boleh huruf dan angka.',
-            'item_name.regex' => 'Nama Barang hanya boleh teks biasa.',
+            'item_name.regex' => 'Nama Part hanya boleh teks biasa.',
         ];
     }
 

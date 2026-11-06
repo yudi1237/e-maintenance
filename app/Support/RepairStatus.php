@@ -153,14 +153,18 @@ class RepairStatus
         ];
     }
 
-    public static function machineCardAlert(int $activeOpCount, int $pendingCloseOpCount, int $openFindingCount): string
+    public static function machineCardAlert(int $unclaimedOpCount, int $onProgressOpCount, int $approvalOpCount, bool $showApproval): string
     {
-        if ($activeOpCount > 0) {
+        if ($unclaimedOpCount > 0) {
             return 'active';
         }
 
-        if ($pendingCloseOpCount > 0 || $openFindingCount > 0) {
+        if ($onProgressOpCount > 0) {
             return 'pending';
+        }
+
+        if ($showApproval && $approvalOpCount > 0) {
+            return 'approval';
         }
 
         return 'idle';
@@ -205,7 +209,7 @@ class RepairStatus
             return true;
         }
 
-        if ($user === null || ! $user->canAccessAdmin()) {
+        if ($user === null || ! $user->canAccessAdmin() || $user->isPpic()) {
             return false;
         }
 
@@ -311,6 +315,16 @@ class RepairStatus
         }, $steps);
     }
 
+    public static function approvalActorColumn(string $status): ?string
+    {
+        return match ($status) {
+            self::APPROVE_PRODUKSI_INJECTION => 'injection_approved_by',
+            self::APPROVE_QUALITY => 'quality_approved_by',
+            self::CLOSE => 'maintenance_approved_by',
+            default => null,
+        };
+    }
+
     public static function pendingApprovalStatusFor(?User $user): ?string
     {
         return match (true) {
@@ -339,20 +353,41 @@ class RepairStatus
         };
     }
 
-    public static function dashboardTicketOrderSql(?User $user): ?string
+    public static function dashboardTicketOrderSql(?User $user): string
     {
-        $pending = self::approvalQueueStatusesFor($user);
+        $ranks = [
+            self::OPEN => 0,
+            self::ON_PROGRESS => 1,
+        ];
+        $next = 2;
 
-        if ($pending === []) {
-            return null;
+        foreach (self::approvalQueueStatusesFor($user) as $status) {
+            if (! array_key_exists($status, $ranks)) {
+                $ranks[$status] = $next;
+                $next++;
+            }
         }
+
+        foreach ([
+            self::CLOSE_BY_TECHNICIAN,
+            self::APPROVE_PRODUKSI_INJECTION,
+            self::APPROVE_QUALITY,
+        ] as $status) {
+            if (! array_key_exists($status, $ranks)) {
+                $ranks[$status] = $next;
+                $next++;
+            }
+        }
+
+        $ranks[self::CLOSE] = $next;
+        $next++;
 
         $sql = 'CASE';
-        foreach ($pending as $index => $status) {
-            $sql .= " WHEN status = '".$status."' THEN ".$index;
+        foreach ($ranks as $status => $rank) {
+            $sql .= " WHEN status = '".$status."' THEN ".$rank;
         }
 
-        return $sql.' ELSE '.count($pending).' END';
+        return $sql.' ELSE '.$next.' END';
     }
 
     /** @return list<string> */
@@ -377,7 +412,7 @@ class RepairStatus
         return match (true) {
             $user?->isProduksiInjection() => 'Produksi Injection',
             $user?->isQuality() => 'Quality',
-            $user?->isManagement() => 'Semua proses',
+            $user?->isManagement(), $user?->isPpic() => 'Semua proses',
             default => 'Admin Maintenance',
         };
     }

@@ -2,9 +2,7 @@
     <x-slot name="title">Input OP Mesin {{ $machineNumber }} · e-Maintenance</x-slot>
 
     <div class="em-shell py-8">
-        <a href="{{ route('scan.machines.show', [$machineNumber, $token]) }}" class="text-sm text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 dark:hover:text-cyan-300">← Kembali</a>
-
-        <div class="mt-4 mb-6">
+        <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-300">Input OP</p>
             <h1 class="mt-1 text-2xl font-bold text-slate-900 dark:text-white">Laporan Stop Mesin</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Mesin No mengikuti barcode yang discan. Tidak perlu diisi manual.</p>
@@ -22,12 +20,7 @@
                     <x-input-error :messages="$errors->get('operator_name')" class="mt-1" />
                 </div>
                 <div class="min-w-0">
-                    <label for="npk" class="em-label min-h-[2.5rem] flex items-end">NPK (Wajib Diisi)</label>
-                    <input id="npk" name="npk" type="text" inputmode="numeric" maxlength="20" pattern="[A-Za-z0-9]+" class="em-input" value="{{ old('npk') }}" required autocomplete="off">
-                    <x-input-error :messages="$errors->get('npk')" class="mt-1" />
-                </div>
-                <div class="min-w-0">
-                    <label for="item_name" class="em-label min-h-[2.5rem] flex items-end">Nama Barang (Wajib Diisi)</label>
+                    <label for="item_name" class="em-label min-h-[2.5rem] flex items-end">Nama Part (Wajib Diisi)</label>
                     <input id="item_name" name="item_name" type="text" inputmode="text" maxlength="200" class="em-input" value="{{ old('item_name') }}" required>
                     <x-input-error :messages="$errors->get('item_name')" class="mt-1" />
                 </div>

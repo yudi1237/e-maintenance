@@ -3,7 +3,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 class="font-semibold text-xl text-gray-800 dark:text-white leading-tight">Master Data Mesin</h2>
             <div class="flex flex-wrap gap-2">
-                <a href="{{ route('admin.machine-names.export') }}" class="em-qr-btn w-fit">
+                <a href="{{ route('admin.machine-names.export', array_filter(['plant' => $plant])) }}" class="em-qr-btn w-fit">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     Download Excel
                 </a>
@@ -19,7 +19,16 @@
         <div class="em-shell space-y-6">
             <x-alert />
 
-            <div>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter Plant</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        <a href="{{ route('admin.machine-names.index') }}" class="rounded-full border px-3 py-1 text-xs font-semibold {{ $plant === null ? 'border-cyan-500 bg-cyan-500/15 text-cyan-700 dark:text-cyan-200' : 'border-slate-200 text-slate-600 hover:border-cyan-400 dark:border-white/10 dark:text-slate-300' }}">Semua</a>
+                        @foreach ($plants as $value => $label)
+                            <a href="{{ route('admin.machine-names.index', ['plant' => $value]) }}" class="rounded-full border px-3 py-1 text-xs font-semibold {{ $plant === $value ? 'border-cyan-500 bg-cyan-500/15 text-cyan-700 dark:text-cyan-200' : 'border-slate-200 text-slate-600 hover:border-cyan-400 dark:border-white/10 dark:text-slate-300' }}">{{ $label }}</a>
+                        @endforeach
+                    </div>
+                </div>
                 <button type="button" class="em-btn-primary w-fit" @click="showForm = ! showForm">Tambah Mesin</button>
             </div>
 
@@ -31,7 +40,7 @@
                 <form method="POST" action="{{ route('admin.machine-names.store') }}" enctype="multipart/form-data" class="space-y-4">
                     @csrf
                     <input type="hidden" name="create_machine" value="1">
-                    @include('admin.machine-names.fields')
+                    @include('admin.machine-names.fields', ['defaultPlant' => $plant])
                     <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
                         <button type="button" class="em-btn-secondary w-full justify-center sm:w-auto" @click="showForm = false">Batal</button>
                         <button type="submit" class="em-btn-primary w-full justify-center sm:w-auto">Simpan Mesin</button>
@@ -46,12 +55,14 @@
                         <thead class="em-table-head">
                             <tr class="text-xs uppercase tracking-wider text-gray-500 dark:text-slate-400">
                                 <th class="px-4 py-3 text-left whitespace-nowrap font-semibold">No Mesin</th>
+                                <th class="px-4 py-3 text-left whitespace-nowrap font-semibold">Plant</th>
                                 <th class="px-4 py-3 text-left whitespace-nowrap font-semibold">QR Code</th>
                                 <th class="px-4 py-3 text-left whitespace-nowrap font-semibold">Brand</th>
                                 <th class="px-4 py-3 text-left whitespace-nowrap font-semibold">Machine Model</th>
                                 <th class="px-4 py-3 text-left whitespace-nowrap font-semibold">Tonage</th>
                                 <th class="px-4 py-3 text-left whitespace-nowrap font-semibold">Tahun</th>
                                 <th class="px-4 py-3 text-left whitespace-nowrap font-semibold">Status</th>
+                                <th class="px-4 py-3 text-left whitespace-nowrap font-semibold">Severity/Kondisi</th>
                                 <th class="px-4 py-3 text-right whitespace-nowrap font-semibold">Aksi</th>
                             </tr>
                         </thead>
@@ -59,6 +70,7 @@
                             @forelse ($machineNames as $machine)
                                 <tr class="hover:bg-gray-50 dark:hover:bg-white/5">
                                     <td class="px-4 py-3 text-gray-900 whitespace-nowrap font-medium dark:text-white">{{ $machine->machine_number ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-gray-800 whitespace-nowrap dark:text-slate-200">{{ \App\Models\MachineName::plantOptions()[$machine->plant] ?? '—' }}</td>
                                     <td class="px-4 py-3 align-top">
                                         @if ($machine->machine_number)
                                             <div class="flex flex-col items-start gap-2 min-w-[11rem]">
@@ -85,6 +97,19 @@
                                             {{ $machine->is_active ? 'Aktif' : 'Nonaktif' }}
                                         </span>
                                     </td>
+                                    <td class="px-4 py-3 align-middle whitespace-nowrap">
+                                        <form method="POST" action="{{ route('admin.machine-names.update', $machine) }}">
+                                            @csrf
+                                            @method('PUT')
+                                            <input type="hidden" name="update_severity" value="1">
+                                            <select name="severity_condition" class="h-8 min-w-[11.5rem] rounded-full border border-slate-200 bg-white px-3 text-xs leading-none text-slate-800 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100" onchange="this.form.submit()">
+                                                <option value="">—</option>
+                                                @foreach (\App\Models\MachineName::severityOptions() as $value => $label)
+                                                    <option value="{{ $value }}" @selected(data_get($machine->severity_conditions, 0) === $value)>{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                        </form>
+                                    </td>
                                     <td class="px-4 py-3 whitespace-nowrap">
                                         <div class="flex items-center justify-end gap-3">
                                             @if ($machine->machine_number)
@@ -108,7 +133,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="px-4 py-10 text-center text-sm text-gray-500">
+                                    <td colspan="10" class="px-4 py-10 text-center text-sm text-gray-500">
                                         Belum ada data mesin. Silakan tambah dari form di atas.
                                     </td>
                                 </tr>

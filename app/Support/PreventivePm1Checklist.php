@@ -215,6 +215,7 @@ class PreventivePm1Checklist
             : [
                 PreventiveChecklist::OK => 'Good',
                 PreventiveChecklist::NOT_OK => 'No Good',
+                PreventiveChecklist::NA => 'N/A',
             ];
     }
 

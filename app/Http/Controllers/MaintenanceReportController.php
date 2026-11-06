@@ -13,6 +13,7 @@ use App\Models\Technician;
 use App\Support\PicAuthenticator;
 use App\Support\PicSession;
 use App\Support\RepairStatus;
+use App\Support\TechnicianShift;
 use App\Support\WorkShift;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Carbon;
@@ -80,6 +81,7 @@ class MaintenanceReportController extends Controller
     public function claimTicket(ClaimOperatorReportRequest $request, OperatorReport $operatorReport): RedirectResponse
     {
         $pic = $this->authenticatedPic($request);
+        TechnicianShift::assertCanTake($pic);
 
         DB::transaction(function () use ($operatorReport, $pic) {
             $ticket = OperatorReport::query()
@@ -246,6 +248,7 @@ class MaintenanceReportController extends Controller
 
         return view('reports.step2', [
             'report' => $report,
+            'technicians' => Technician::query()->active()->orderBy('name')->get(),
         ]);
     }
 
@@ -285,6 +288,19 @@ class MaintenanceReportController extends Controller
             $validated['sparepart_items'] ?? []
         );
 
+        $workers = ['mode' => $validated['worker_mode'], 'names' => []];
+        if ($validated['worker_mode'] === 'self') {
+            $workers['names'] = [auth()->user()->name];
+        } else {
+            $team = Technician::query()
+                ->active()
+                ->whereIn('id', $validated['technician_ids'] ?? [])
+                ->orderBy('name')
+                ->get();
+            $workers['technician_ids'] = $team->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            $workers['names'] = $team->map(fn (Technician $technician) => $technician->optionLabel())->all();
+        }
+
         $report->update([
             'masalah' => $validated['masalah'],
             'analisa_penyebab_kerusakan' => $validated['analisa_penyebab_kerusakan'],
@@ -292,6 +308,7 @@ class MaintenanceReportController extends Controller
             'tindakan_perbaikan_2' => null,
             'penggunaan_sparepart' => $sparepart['text'],
             'sparepart_items' => $sparepart['items'],
+            'yang_mengerjakan' => $workers,
             'ada_op' => $report->operator_report_id !== null,
             'status_perbaikan' => RepairStatus::CLOSE_BY_TECHNICIAN,
             'evidence_path' => $evidencePath,

@@ -16,6 +16,17 @@ class UpdateReportStatusRequest extends FormRequest
         return $this->user()?->canAccessAdmin() ?? false;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('line_stop_mesin') === '') {
+            $this->merge(['line_stop_mesin' => null]);
+        }
+
+        if ($this->input('sub_damage_category_id') === '') {
+            $this->merge(['sub_damage_category_id' => null]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -27,6 +38,17 @@ class UpdateReportStatusRequest extends FormRequest
                 'string',
                 Rule::in(DamageCauseCategory::values()),
             ],
+            'line_stop_mesin' => [
+                'required_if:status_perbaikan,'.RepairStatus::CLOSE,
+                'nullable',
+                Rule::in(['yes', 'no']),
+            ],
+            'sub_damage_category_id' => [
+                'required_if:status_perbaikan,'.RepairStatus::CLOSE,
+                'nullable',
+                'integer',
+                Rule::exists('damage_categories', 'id')->where('is_active', true),
+            ],
         ];
     }
 
@@ -36,6 +58,8 @@ class UpdateReportStatusRequest extends FormRequest
             'status_perbaikan' => 'status perbaikan',
             'tindakan_perbaikan' => 'Tindakan Perbaikan',
             'damage_cause_category' => 'Kategori Penyebab Kerusakan',
+            'line_stop_mesin' => 'Line Stop Mesin',
+            'sub_damage_category_id' => 'Sub Kerusakan',
         ];
     }
 

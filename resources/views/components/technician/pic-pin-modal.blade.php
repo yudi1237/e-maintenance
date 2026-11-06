@@ -11,7 +11,7 @@
     <div class="relative my-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl sm:p-8 dark:border dark:border-white/10 dark:bg-slate-900" data-pic-pin-panel style="pointer-events:auto;">
         <h2 id="pic-pin-modal-title" class="text-xl font-bold text-slate-800 dark:text-white">Pilih PIC Teknisi</h2>
         <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400" data-pic-pin-copy>
-            Pilih PIC lalu masukkan PIN untuk mengambil tiket.
+            Hanya teknisi pada shift yang sedang berjalan yang bisa mengambil OP, Preventive, dan tugas teknisi lain.
         </p>
 
         <form method="POST" class="mt-5 space-y-4" data-pic-pin-form>
@@ -21,7 +21,7 @@
             <div data-pic-pin-select-wrap>
                 <label for="pic-pin-technician" class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">PIC Teknisi</label>
                 @if ($technicians->isEmpty())
-                    <p class="text-sm text-amber-600 dark:text-amber-300">Belum ada PIC teknisi. Minta admin menambahkannya di menu Tambah Teknisi.</p>
+                    <p class="text-sm text-amber-600 dark:text-amber-300">Tidak ada teknisi pada shift yang sedang berjalan. Minta admin memetakan shift di dashboard.</p>
                 @else
                     <select
                         id="pic-pin-technician"

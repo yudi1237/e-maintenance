@@ -15,10 +15,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MachineNameController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $plant = $this->selectedPlant($request);
+
         return view('admin.machine-names.index', [
-            'machineNames' => MachineName::orderByRaw('machine_number is null')
+            'plant' => $plant,
+            'plants' => MachineName::plantOptions(),
+            'machineNames' => MachineName::query()
+                ->when($plant, fn ($query) => $query->where('plant', $plant))
+                ->orderByRaw('machine_number is null')
                 ->orderBy('machine_number')
                 ->orderBy('name')
                 ->paginate(TablePagination::perPage())
@@ -35,7 +41,7 @@ class MachineNameController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate($this->specRules());
+        $validated = $request->validate($this->specRules(), $this->specMessages());
         $machine = MachineName::create($this->payload($validated, isActive: true));
         $this->storePhotos($request, $machine);
 
@@ -52,7 +58,19 @@ class MachineNameController extends Controller
             return back()->with('success', 'Status mesin berhasil diperbarui.');
         }
 
-        $validated = $request->validate($this->specRules($machineName->id));
+        if ($request->boolean('update_severity')) {
+            $validated = $request->validate([
+                'severity_condition' => ['nullable', 'string', Rule::in(array_keys(MachineName::severityOptions()))],
+            ]);
+            $condition = $validated['severity_condition'] ?? null;
+            $machineName->update([
+                'severity_conditions' => $condition ? [$condition] : [],
+            ]);
+
+            return back()->with('success', 'Severity/kondisi mesin berhasil diperbarui.');
+        }
+
+        $validated = $request->validate($this->specRules($machineName->id), $this->specMessages());
         $machineName->update($this->payload($validated, $machineName->is_active));
         $this->storePhotos($request, $machineName, merge: true);
 
@@ -61,9 +79,11 @@ class MachineNameController extends Controller
             ->with('success', 'Master data mesin berhasil diperbarui.');
     }
 
-    public function export(): StreamedResponse|RedirectResponse
+    public function export(Request $request): StreamedResponse|RedirectResponse
     {
+        $plant = $this->selectedPlant($request);
         $machines = MachineName::query()
+            ->when($plant, fn ($query) => $query->where('plant', $plant))
             ->orderByRaw('machine_number is null')
             ->orderBy('machine_number')
             ->orderBy('name')
@@ -112,7 +132,7 @@ class MachineNameController extends Controller
 
         Storage::disk('public')->delete($photos[$photoIndex]);
         $photos[$photoIndex] = $request->file('photo')->store(
-            'machine-photos/'.$machineName->machine_number,
+            'machine-photos/'.$machineName->plant.'/'.$machineName->machine_number,
             'public'
         );
         $machineName->update(['machine_photos' => $photos]);
@@ -139,12 +159,21 @@ class MachineNameController extends Controller
         return back()->with('success', 'Nama mesin berhasil dihapus.');
     }
 
+    private function selectedPlant(Request $request): ?string
+    {
+        $plant = (string) $request->query('plant', '');
+
+        return array_key_exists($plant, MachineName::plantOptions()) ? $plant : null;
+    }
+
     /**
      * @return array<string, mixed>
      */
     private function specRules(?int $ignoreId = null): array
     {
-        $uniqueNumber = Rule::unique('machine_names', 'machine_number');
+        $plant = (string) request()->input('plant');
+        $uniqueNumber = Rule::unique('machine_names', 'machine_number')
+            ->where(fn ($query) => $query->where('plant', $plant));
         $uniqueAsset = Rule::unique('machine_names', 'asset_number');
 
         if ($ignoreId) {
@@ -154,6 +183,7 @@ class MachineNameController extends Controller
 
         return [
             'machine_number' => ['required', 'integer', 'min:1', 'max:'.config('maintenance.machine_count', 60), $uniqueNumber],
+            'plant' => ['required', 'string', Rule::in(array_keys(MachineName::plantOptions()))],
             'asset_number' => ['required', 'string', 'max:100', $uniqueAsset],
             'screw_diameter_mm' => ['required', 'integer', 'min:1', 'max:9999'],
             'brand' => ['required', 'string', 'max:100'],
@@ -173,8 +203,17 @@ class MachineNameController extends Controller
             'shot_weight_med_gr' => ['required', 'integer', 'min:0', 'max:9999'],
             'manufacture_year' => ['required', 'integer', 'min:1900', 'max:2100'],
             'specification' => ['nullable', 'string', 'max:2000'],
+            'severity_condition' => ['nullable', 'string', Rule::in(array_keys(MachineName::severityOptions()))],
             'photos' => ['nullable', 'array', 'max:10'],
             'photos.*' => ['file', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function specMessages(): array
+    {
+        return [
+            'machine_number.unique' => 'No mesin ini sudah ada di plant yang sama. Plant lain boleh memakai nomor yang sama.',
         ];
     }
 
@@ -186,6 +225,7 @@ class MachineNameController extends Controller
     {
         return [
             'machine_number' => $validated['machine_number'],
+            'plant' => $validated['plant'],
             'asset_number' => $validated['asset_number'],
             'screw_diameter_mm' => $validated['screw_diameter_mm'],
             'brand' => $validated['brand'],
@@ -206,6 +246,7 @@ class MachineNameController extends Controller
             'manufacture_year' => $validated['manufacture_year'],
             'name' => $validated['brand'].' '.$validated['machine_model'].' '.$validated['tonnage'].'T',
             'specification' => $validated['specification'] ?? null,
+            'severity_conditions' => filled($validated['severity_condition'] ?? null) ? [$validated['severity_condition']] : [],
             'is_active' => $isActive,
         ];
     }
@@ -214,7 +255,7 @@ class MachineNameController extends Controller
     {
         $photoPaths = [];
         foreach ($request->file('photos', []) as $file) {
-            $photoPaths[] = $file->store('machine-photos/'.$machine->machine_number, 'public');
+            $photoPaths[] = $file->store('machine-photos/'.$machine->plant.'/'.$machine->machine_number, 'public');
         }
 
         if ($photoPaths === []) {

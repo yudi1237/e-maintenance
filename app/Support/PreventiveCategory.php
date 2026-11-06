@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\PreventiveCategoryRecord;
+
 class PreventiveCategory
 {
     /**
@@ -141,6 +143,12 @@ class PreventiveCategory
 
     public static function formTitle(?string $category): string
     {
+        $label = self::label($category);
+        $default = self::labels()[$category] ?? null;
+        if ($default !== null && $label !== $default) {
+            return str_starts_with($label, 'Preventive ') ? $label : 'Preventive '.$label;
+        }
+
         return match ($category) {
             'MTC' => 'Preventive Mold Temperature Control',
             'HOPPER' => 'Preventive Hopper',
@@ -154,8 +162,28 @@ class PreventiveCategory
         };
     }
 
+    public static function documentNumber(?string $category): ?string
+    {
+        return match ($category) {
+            'PM1', 'PM2', 'PM3', 'PM4', 'P1E', 'JSWEL' => 'FM.002-DPP-MTC-01',
+            'MTC' => 'FM.013-DPP-MTC-01',
+            'HOPPER' => 'FM.014-DPP-MTC-01',
+            'DEHUM' => 'FM.015-DPP-MTC-01',
+            'ROBOT' => 'FM.016-DPP-MTC-01',
+            'HOT' => 'FM.017-DPP-MTC-01',
+            'CONVEYOR' => 'FM.018-DPP-MTC-01',
+            default => null,
+        };
+    }
+
     public static function label(?string $category): string
     {
+        $stored = PreventiveCategoryRecord::storedLabel($category);
+
+        if ($stored !== null && $stored !== '') {
+            return $stored;
+        }
+
         return self::labels()[$category] ?? (string) $category;
     }
 

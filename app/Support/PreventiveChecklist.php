@@ -52,4 +52,29 @@ class PreventiveChecklist
 
         return 'ok';
     }
+
+    /**
+     * @param  list<string>  $allowedKeys
+     * @param  array<string, mixed>  $remarks
+     * @return array<string, string>
+     */
+    public static function sanitizeRemarks(array $allowedKeys, array $remarks): array
+    {
+        $allowed = array_fill_keys($allowedKeys, true);
+        $clean = [];
+
+        foreach ($remarks as $key => $value) {
+            $key = (string) $key;
+            if (! isset($allowed[$key])) {
+                continue;
+            }
+
+            $text = trim((string) $value);
+            if ($text !== '') {
+                $clean[$key] = $text;
+            }
+        }
+
+        return $clean;
+    }
 }

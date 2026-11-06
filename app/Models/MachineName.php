@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MachineName extends Model
@@ -29,14 +30,18 @@ class MachineName extends Model
         'shot_weight_med_gr',
         'manufacture_year',
         'name',
+        'mold_id',
+        'plant',
         'specification',
         'is_active',
+        'severity_conditions',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'severity_conditions' => 'array',
             'machine_number' => 'integer',
             'screw_diameter_mm' => 'integer',
             'machine_photos' => 'array',
@@ -73,9 +78,48 @@ class MachineName extends Model
         return $this->hasMany(PreventiveSchedule::class);
     }
 
+    public const PLANT_CIKARANG = 'plant_1_cikarang';
+
+    public const PLANT_KARAWACI = 'plant_2_karawaci';
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeOperational($query)
+    {
+        return $query->where('plant', self::PLANT_CIKARANG);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function plantOptions(): array
+    {
+        return [
+            self::PLANT_CIKARANG => 'Plant 1 Cikarang',
+            self::PLANT_KARAWACI => 'Plant 2 Karawaci',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function severityOptions(): array
+    {
+        return [
+            'quick_fix' => 'Quick Fix',
+            'minor_issue' => 'Minor Issue',
+            'medium_breakdown' => 'Medium Breakdown',
+            'major_breakdown' => 'Major Breakdown',
+            'total_breakdown' => 'Total Breakdown',
+        ];
+    }
+
+    public function mold(): BelongsTo
+    {
+        return $this->belongsTo(Mold::class);
     }
 
     public function viewLabel(): string

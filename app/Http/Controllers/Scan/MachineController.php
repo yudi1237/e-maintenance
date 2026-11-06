@@ -25,8 +25,17 @@ class MachineController extends Controller
         $this->assertScanAccess($machineNumber, $token);
 
         $machine = MachineName::query()
+            ->operational()
             ->where('machine_number', $machineNumber)
             ->first();
+
+        $operatorTickets = OperatorReport::query()
+            ->with(['machineName', 'claimedTechnician', 'claimedBy'])
+            ->where('machine_number', $machineNumber)
+            ->whereDoesntHave('maintenanceReport')
+            ->orderByDesc('stop_date')
+            ->orderByDesc('id')
+            ->get();
 
         $problemReports = MaintenanceReport::query()
             ->with(['machineName', 'damageCategory'])
@@ -56,6 +65,7 @@ class MachineController extends Controller
             'machineNumber' => $machineNumber,
             'token' => $token,
             'machine' => $machine,
+            'operatorTickets' => $operatorTickets,
             'problemReports' => $problemReports,
             'preventiveReports' => $preventiveReports,
             'recaps' => $recaps,
@@ -68,6 +78,7 @@ class MachineController extends Controller
         $this->assertScanAccess($machineNumber, $token);
 
         $machine = MachineName::query()
+            ->operational()
             ->where('machine_number', $machineNumber)
             ->first();
 
@@ -125,6 +136,7 @@ class MachineController extends Controller
         $this->assertScanAccess($machineNumber, $token);
 
         $machine = MachineName::query()
+            ->operational()
             ->where('machine_number', $machineNumber)
             ->first();
 
@@ -133,17 +145,29 @@ class MachineController extends Controller
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
         ]);
 
+        $operatorTicketsQuery = OperatorReport::query()
+            ->with(['machineName', 'claimedTechnician', 'claimedBy'])
+            ->where('machine_number', $machineNumber)
+            ->whereDoesntHave('maintenanceReport');
+
         $reportsQuery = MaintenanceReport::query()
             ->with(['machineName', 'damageCategory'])
             ->where('machine_number', $machineNumber);
 
         if (! empty($filters['start_date'])) {
+            $operatorTicketsQuery->whereDate('stop_date', '>=', $filters['start_date']);
             $reportsQuery->whereDate('report_date', '>=', $filters['start_date']);
         }
 
         if (! empty($filters['end_date'])) {
+            $operatorTicketsQuery->whereDate('stop_date', '<=', $filters['end_date']);
             $reportsQuery->whereDate('report_date', '<=', $filters['end_date']);
         }
+
+        $operatorTickets = $operatorTicketsQuery
+            ->orderByDesc('stop_date')
+            ->orderByDesc('id')
+            ->get();
 
         $reports = $reportsQuery
             ->latest()
@@ -154,9 +178,14 @@ class MachineController extends Controller
             'machineNumber' => $machineNumber,
             'token' => $token,
             'machine' => $machine,
+            'operatorTickets' => $operatorTickets,
             'reports' => $reports,
-            'reportCount' => MaintenanceReport::where('machine_number', $machineNumber)->count(),
-            'filteredReportCount' => $reports->total(),
+            'reportCount' => MaintenanceReport::where('machine_number', $machineNumber)->count()
+                + OperatorReport::query()
+                    ->where('machine_number', $machineNumber)
+                    ->whereDoesntHave('maintenanceReport')
+                    ->count(),
+            'filteredReportCount' => $reports->total() + $operatorTickets->count(),
             'startDate' => $filters['start_date'] ?? null,
             'endDate' => $filters['end_date'] ?? null,
             'statusLabels' => RepairStatus::labels(),
@@ -168,6 +197,7 @@ class MachineController extends Controller
         $this->assertScanAccess($machineNumber, $token);
 
         $scannedMachine = MachineName::query()
+            ->operational()
             ->where('machine_number', $machineNumber)
             ->first();
 
@@ -186,12 +216,13 @@ class MachineController extends Controller
     {
         $validated = $request->validated();
         $machine = MachineName::query()
+            ->operational()
             ->where('machine_number', $machineNumber)
             ->first();
 
         OperatorReport::create([
             'operator_name' => $validated['operator_name'],
-            'npk' => $validated['npk'],
+            'npk' => '',
             'item_name' => $validated['item_name'],
             'machine_name_id' => $machine?->id,
             'machine_number' => $machineNumber,
@@ -201,6 +232,12 @@ class MachineController extends Controller
             'chronology' => $validated['chronology'] ?? null,
             'status' => RepairStatus::OPEN,
         ]);
+
+        if ($request->user()?->isOperator()) {
+            return redirect()
+                ->route('operator.home')
+                ->with('op_created', true);
+        }
 
         return redirect()
             ->route('scan.machines.show', [$machineNumber, $token])
@@ -227,6 +264,7 @@ class MachineController extends Controller
         $this->assertScanAccess($machineNumber, $token);
 
         $machine = MachineName::query()
+            ->operational()
             ->where('machine_number', $machineNumber)
             ->first();
 

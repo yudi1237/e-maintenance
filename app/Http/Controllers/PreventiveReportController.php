@@ -10,14 +10,19 @@ use App\Models\MachineName;
 use App\Models\PreventiveReport;
 use App\Models\PreventiveSchedule;
 use App\Models\Robot;
+use App\Models\Technician;
+use App\Models\TechnicianPreventiveJob;
 use App\Support\EquipmentCategory;
 use App\Support\PicAuthenticator;
 use App\Support\PicSession;
 use App\Support\PreventiveCategory;
+use App\Support\PreventiveChecklist;
 use App\Support\PreventiveEvidence;
 use App\Support\PreventiveMachineChecklist;
 use App\Support\PreventiveStatus;
+use App\Support\SparepartUsage;
 use App\Support\TablePagination;
+use App\Support\TechnicianShift;
 use App\Support\WorkShift;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -35,6 +40,7 @@ class PreventiveReportController extends Controller
             $request->integer('technician_id'),
             (string) $request->input('pin')
         );
+        TechnicianShift::assertCanTake($pic);
 
         PicSession::set($pic);
 
@@ -121,7 +127,9 @@ class PreventiveReportController extends Controller
         abort_unless(PreventiveCategory::isValid($category), 404);
 
         $pic = $this->requirePic();
+        TechnicianShift::ensureCanTake($pic);
         $machine = $this->findActiveMachine($machineNumber);
+        TechnicianPreventiveJob::open($pic, (int) $machine->machine_number, $category);
 
         return view('preventive.form', [
             'machine' => $machine,
@@ -131,6 +139,7 @@ class PreventiveReportController extends Controller
             'picName' => $pic->name,
             'detectedShift' => WorkShift::detect(),
             'shiftLabels' => WorkShift::labels(),
+            'technicians' => Technician::query()->active()->orderBy('name')->get(),
             'robots' => $category === 'ROBOT'
                 ? Robot::query()->active()->orderBy('robot_number')->get()
                 : collect(),
@@ -164,6 +173,10 @@ class PreventiveReportController extends Controller
             $category,
             $validated['readings'] ?? []
         );
+        $remarks = PreventiveChecklist::sanitizeRemarks(
+            PreventiveMachineChecklist::allItemKeys($category),
+            $validated['remarks'] ?? []
+        );
 
         $robot = $category === 'ROBOT'
             ? Robot::query()->active()->findOrFail($validated['robot_id'])
@@ -179,6 +192,7 @@ class PreventiveReportController extends Controller
         $equipmentNumber = $robot?->robot_number
             ?? $equipment?->number
             ?? ($validated['equipment_number'] ?? null);
+        $sparepart = SparepartUsage::persisted($validated);
 
         PreventiveReport::create([
             'user_id' => auth()->id(),
@@ -194,13 +208,19 @@ class PreventiveReportController extends Controller
             'category' => $category,
             'work_date' => now()->timezone('Asia/Jakarta')->toDateString(),
             'work_shift' => $validated['work_shift'],
+            'team_members' => ($team = Technician::teamSnapshot($validated['technician_ids'] ?? [])) === [] ? null : $team,
             'items' => $items,
             'readings' => $readings === [] ? null : $readings,
+            'item_remarks' => $remarks === [] ? null : $remarks,
             'notes' => $validated['notes'] ?? null,
+            'penggunaan_sparepart' => $sparepart['text'],
+            'sparepart_items' => $sparepart['items'],
             'evidence_paths' => PreventiveEvidence::storeFromRequest($request) ?: null,
             'result' => PreventiveMachineChecklist::result($category, $items),
             'status' => PreventiveStatus::CLOSE_BY_TECHNICIAN,
         ]);
+
+        TechnicianPreventiveJob::close($pic, (int) $machine->machine_number, $category);
 
         $redirect = $request->input('from') === 'schedule'
             ? redirect()->route('preventive.menu')
@@ -239,6 +259,7 @@ class PreventiveReportController extends Controller
     private function findActiveMachine(int $machineNumber): MachineName
     {
         return MachineName::query()
+            ->operational()
             ->active()
             ->whereNotNull('machine_number')
             ->where('machine_number', $machineNumber)

@@ -81,7 +81,7 @@ class PreventiveSchedule extends Model
      *
      * @return list<int>
      */
-    public static function closedIds(): array
+    public static function closedIds(?string $reportStatus = null): array
     {
         $remaining = static::query()
             ->orderBy('plan_date')
@@ -90,6 +90,7 @@ class PreventiveSchedule extends Model
             ->keyBy('id');
 
         $reports = PreventiveReport::query()
+            ->when($reportStatus !== null, fn ($query) => $query->where('status', $reportStatus))
             ->orderBy('work_date')
             ->orderBy('id')
             ->get(['id', 'machine_number', 'category', 'work_date']);

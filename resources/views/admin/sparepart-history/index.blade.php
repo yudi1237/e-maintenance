@@ -3,7 +3,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900 dark:text-white">History Spare Part</h1>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Penggunaan spare part dari tiket OP yang sudah Close dan lulus semua approval, urut tanggal terbaru.</p>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Penggunaan spare part dari tiket OP yang sudah Close dan dari check sheet preventive, urut tanggal terbaru.</p>
             </div>
             <a href="{{ route('admin.sparepart-history.export', $filters) }}" class="em-qr-btn w-fit">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>

@@ -35,6 +35,33 @@
                     <p class="mt-2 hidden text-sm font-medium text-red-500" data-close-status-damage-error>Kategori Penyebab Kerusakan wajib dipilih sebelum tiket diproses Maintenance.</p>
                 </div>
                 <div>
+                    <label for="close-status-line-stop" class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">Line Stop Mesin <span class="text-red-500">*</span></label>
+                    <select
+                        id="close-status-line-stop"
+                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-inner outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100 dark:border-slate-600 dark:bg-slate-950 dark:text-white dark:focus:bg-slate-900 dark:focus:ring-cyan-500/20"
+                        data-close-status-line-stop
+                    >
+                        <option value="">Pilih line stop mesin</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                    </select>
+                    <p class="mt-2 hidden text-sm font-medium text-red-500" data-close-status-line-stop-error>Line Stop Mesin wajib dipilih sebelum tiket diproses Maintenance.</p>
+                </div>
+                <div>
+                    <label for="close-status-sub-damage" class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">Sub Kerusakan <span class="text-red-500">*</span></label>
+                    <select
+                        id="close-status-sub-damage"
+                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-inner outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-100 dark:border-slate-600 dark:bg-slate-950 dark:text-white dark:focus:bg-slate-900 dark:focus:ring-cyan-500/20"
+                        data-close-status-sub-damage
+                    >
+                        <option value="">Pilih sub kerusakan</option>
+                        @foreach (\App\Models\DamageCategory::query()->active()->get() as $category)
+                            <option value="{{ $category->id }}">{{ $category->displayLabel() }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-2 hidden text-sm font-medium text-red-500" data-close-status-sub-damage-error>Sub Kerusakan wajib dipilih sebelum tiket diproses Maintenance.</p>
+                </div>
+                <div>
                     <label for="close-status-tindakan" class="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-200">Tindakan Perbaikan <span class="text-red-500">*</span></label>
                     <textarea
                         id="close-status-tindakan"
@@ -64,8 +91,12 @@
                 const modal = document.getElementById('close-status-modal');
                 const textarea = modal?.querySelector('[data-close-status-textarea]');
                 const damageCause = modal?.querySelector('[data-close-status-damage-cause]');
+                const lineStop = modal?.querySelector('[data-close-status-line-stop]');
+                const subDamage = modal?.querySelector('[data-close-status-sub-damage]');
                 const error = modal?.querySelector('[data-close-status-error]');
                 const damageError = modal?.querySelector('[data-close-status-damage-error]');
+                const lineStopError = modal?.querySelector('[data-close-status-line-stop-error]');
+                const subDamageError = modal?.querySelector('[data-close-status-sub-damage-error]');
                 const machine = modal?.querySelector('[data-close-status-machine]');
                 let activeForm = null;
                 let activeSelect = null;
@@ -83,12 +114,22 @@
                     activeSelect = select;
                     const input = form?.querySelector('[data-tindakan-perbaikan-input]');
                     const damageInput = form?.querySelector('[data-damage-cause-input]');
+                    const lineStopInput = form?.querySelector('[data-line-stop-input]');
+                    const subDamageInput = form?.querySelector('[data-sub-damage-input]');
                     textarea.value = input?.value || '';
                     if (damageCause) {
                         damageCause.value = damageInput?.value || '';
                     }
+                    if (lineStop) {
+                        lineStop.value = lineStopInput?.value || '';
+                    }
+                    if (subDamage) {
+                        subDamage.value = subDamageInput?.value || '';
+                    }
                     error.classList.add('hidden');
                     damageError?.classList.add('hidden');
+                    lineStopError?.classList.add('hidden');
+                    subDamageError?.classList.add('hidden');
                     machine.textContent = 'Mesin #' + machineNumber;
                     modal.classList.remove('hidden');
                     modal.classList.add('flex');
@@ -140,6 +181,8 @@
 
                 modal?.querySelector('[data-close-status-submit]')?.addEventListener('click', () => {
                     const category = (damageCause?.value || '').trim();
+                    const lineStopValue = (lineStop?.value || '').trim();
+                    const subDamageValue = (subDamage?.value || '').trim();
                     const tindakanPerbaikan = textarea.value.trim();
                     let hasError = false;
 
@@ -148,6 +191,20 @@
                         hasError = true;
                     } else {
                         damageError?.classList.add('hidden');
+                    }
+
+                    if (!lineStopValue) {
+                        lineStopError?.classList.remove('hidden');
+                        hasError = true;
+                    } else {
+                        lineStopError?.classList.add('hidden');
+                    }
+
+                    if (!subDamageValue) {
+                        subDamageError?.classList.remove('hidden');
+                        hasError = true;
+                    } else {
+                        subDamageError?.classList.add('hidden');
                     }
 
                     if (!tindakanPerbaikan) {
@@ -160,6 +217,10 @@
                     if (hasError) {
                         if (!category) {
                             damageCause?.focus();
+                        } else if (!lineStopValue) {
+                            lineStop?.focus();
+                        } else if (!subDamageValue) {
+                            subDamage?.focus();
                         } else {
                             textarea.focus();
                         }
@@ -169,12 +230,16 @@
                     const form = activeForm;
                     const input = form?.querySelector('[data-tindakan-perbaikan-input]');
                     const damageInput = form?.querySelector('[data-damage-cause-input]');
-                    if (!form || !input || !damageInput) {
+                    const lineStopInput = form?.querySelector('[data-line-stop-input]');
+                    const subDamageInput = form?.querySelector('[data-sub-damage-input]');
+                    if (!form || !input || !damageInput || !lineStopInput || !subDamageInput) {
                         return;
                     }
 
                     input.value = tindakanPerbaikan;
                     damageInput.value = category;
+                    lineStopInput.value = lineStopValue;
+                    subDamageInput.value = subDamageValue;
                     closeModal(false);
                     form.submit();
                 });

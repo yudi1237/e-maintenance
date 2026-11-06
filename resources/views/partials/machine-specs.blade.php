@@ -113,7 +113,7 @@
             @if (! empty($public))
                 Data master untuk Mesin {{ $machineNumber }} belum tersedia.
             @else
-                Data master untuk Mesin {{ $machineNumber }} belum tersedia. Silakan isi di menu Master Data Mesin.
+                Data master untuk Mesin {{ $machineNumber }} belum tersedia. Silakan isi di menu Asset → Data Mesin.
             @endif
         </div>
     @endif

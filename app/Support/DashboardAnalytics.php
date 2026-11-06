@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\MachineName;
+use App\Models\MachineRunDay;
 use App\Models\OperatorReport;
 use App\Models\PreventiveReport;
 use App\Models\PreventiveSchedule;
@@ -15,7 +17,9 @@ class DashboardAnalytics
      *     period_label: string,
      *     performer: array{labels: list<string>, on_progress: list<int>, closed_technician: list<int>, closed_admin: list<int>},
      *     technician_mttr: array{labels: list<string>, values: list<int>, avg_minutes: int|null},
-     *     machines: array{labels: list<string>, values: list<int>}
+     *     machines: array{labels: list<string>, values: list<int>},
+     *     machine_status: array{labels: list<string>, values: list<int>, colors: list<string>},
+     *     severity: array{labels: list<string>, values: list<int>, colors: list<string>, total: int}
      * }
      */
     public static function charts(?Carbon $now = null): array
@@ -38,6 +42,90 @@ class DashboardAnalytics
             'performer' => self::performerChart($tickets),
             'technician_mttr' => self::technicianMttrChart($tickets),
             'machines' => self::lineStopChart($tickets),
+            'machine_status' => self::machineStatusChart(),
+            'severity' => self::severityChart(),
+        ];
+    }
+
+    /**
+     * @return array{labels: list<string>, values: list<int>, colors: list<string>, total: int}
+     */
+    public static function severityChart(): array
+    {
+        $colors = [
+            'quick_fix' => '#22c55e',
+            'minor_issue' => '#facc15',
+            'medium_breakdown' => '#fb923c',
+            'major_breakdown' => '#ef4444',
+            'total_breakdown' => '#7f1d1d',
+        ];
+        $counts = array_fill_keys(array_keys(MachineName::severityOptions()), 0);
+
+        MachineName::query()->operational()->get(['severity_conditions'])->each(function (MachineName $machine) use (&$counts): void {
+            $key = data_get($machine->severity_conditions, 0);
+            if (is_string($key) && array_key_exists($key, $counts)) {
+                $counts[$key]++;
+            }
+        });
+
+        return [
+            'labels' => array_values(MachineName::severityOptions()),
+            'values' => array_values($counts),
+            'colors' => array_values($colors),
+            'total' => array_sum($counts),
+        ];
+    }
+
+    /**
+     * Satu mesin masuk satu kategori. Breakdown diutamakan, lalu OP On Progress
+     * sampai Close by teknisi, lalu tanda Running. Sisanya standby.
+     *
+     * @return array{labels: list<string>, values: list<int>, colors: list<string>}
+     */
+    public static function machineStatusChart(): array
+    {
+        $numbers = MachineName::query()
+            ->operational()
+            ->active()
+            ->whereNotNull('machine_number')
+            ->pluck('machine_number')
+            ->map(fn ($number) => (int) $number)
+            ->all();
+
+        $running = array_fill_keys(MachineRunDay::runningMachineNumbers(), true);
+        $breakdown = array_fill_keys(MachineRunDay::breakdownMachineNumbers(), true);
+        $maintenance = array_fill_keys(
+            OperatorReport::query()
+                ->whereIn('status', [RepairStatus::ON_PROGRESS, RepairStatus::CLOSE_BY_TECHNICIAN])
+                ->whereIn('machine_number', $numbers === [] ? [0] : $numbers)
+                ->distinct()
+                ->pluck('machine_number')
+                ->map(fn ($number) => (int) $number)
+                ->all(),
+            true
+        );
+
+        $active = 0;
+        $standby = 0;
+        $inMaintenance = 0;
+        $down = 0;
+
+        foreach ($numbers as $number) {
+            if (isset($breakdown[$number])) {
+                $down++;
+            } elseif (isset($maintenance[$number])) {
+                $inMaintenance++;
+            } elseif (isset($running[$number])) {
+                $active++;
+            } else {
+                $standby++;
+            }
+        }
+
+        return [
+            'labels' => ['M/c Total', 'Active (Running)', 'Standby', 'In Maintenance', 'Breakdown'],
+            'values' => [count($numbers), $active, $standby, $inMaintenance, $down],
+            'colors' => ['#334155', '#22c55e', '#94a3b8', '#eab308', '#ef4444'],
         ];
     }
 

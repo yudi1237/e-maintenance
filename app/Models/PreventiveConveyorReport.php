@@ -16,8 +16,12 @@ class PreventiveConveyorReport extends Model
         'conveyor_name',
         'work_date',
         'work_shift',
+        'team_members',
         'items',
+        'item_remarks',
         'notes',
+        'penggunaan_sparepart',
+        'sparepart_items',
         'evidence_paths',
         'result',
     ];
@@ -26,7 +30,10 @@ class PreventiveConveyorReport extends Model
     {
         return [
             'work_date' => 'date',
+            'team_members' => 'array',
             'items' => 'array',
+            'item_remarks' => 'array',
+            'sparepart_items' => 'array',
             'evidence_paths' => 'array',
         ];
     }
@@ -39,6 +46,16 @@ class PreventiveConveyorReport extends Model
     public function getWorkShiftLabelAttribute(): string
     {
         return WorkShift::labels()[$this->work_shift] ?? $this->work_shift;
+    }
+
+    public function getTeamMembersLabelAttribute(): string
+    {
+        $names = collect($this->team_members ?? [])
+            ->map(fn ($member) => is_array($member) ? ($member['name'] ?? '') : (string) $member)
+            ->filter()
+            ->values();
+
+        return $names->isEmpty() ? '—' : $names->implode(', ');
     }
 
     /**

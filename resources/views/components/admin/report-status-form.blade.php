@@ -47,6 +47,8 @@
             <input type="hidden" name="status_perbaikan" value="{{ $next }}">
             <input type="hidden" name="tindakan_perbaikan" value="{{ $report->tindakan_perbaikan }}" data-tindakan-perbaikan-input>
             <input type="hidden" name="damage_cause_category" value="{{ $report->damage_cause_category }}" data-damage-cause-input>
+            <input type="hidden" name="line_stop_mesin" value="{{ $report->line_stop_mesin === null ? '' : ($report->line_stop_mesin ? 'yes' : 'no') }}" data-line-stop-input>
+            <input type="hidden" name="sub_damage_category_id" value="{{ $report->sub_damage_category_id }}" data-sub-damage-input>
             <button
                 type="{{ $isCloseStep ? 'button' : 'submit' }}"
                 class="em-status-approve-btn {{ $compact ? 'px-2.5 py-1 text-[11px]' : 'px-3 py-1.5 text-xs' }}"

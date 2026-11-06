@@ -3,44 +3,36 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\FindingRecap;
+use App\Models\LayoutClusterName;
 use App\Models\MachineName;
+use App\Models\MachineRunDay;
 use App\Models\MaintenanceReport;
+use App\Models\Mold;
 use App\Models\OperatorReport;
 use App\Models\PreventiveReport;
-use App\Models\PreventiveSchedule;
+use App\Models\Technician;
 use App\Support\DashboardAnalytics;
-use App\Support\FindingRecapStatus;
 use App\Support\InjectionMachine;
-use App\Support\PreventiveStatus;
+use App\Support\LayoutCluster;
+use App\Support\MachineCardBoard;
 use App\Support\RepairStatus;
 use App\Support\TablePagination;
+use App\Support\TechnicianDuty;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request): View
+    public function index(): View
     {
         $summary = $this->dashboardSummary();
         $machines = $this->masterMachines();
         $machineNumbers = $machines->pluck('machine_number')->all();
         $now = now()->timezone('Asia/Jakarta');
         [$pmYear, $pmMonth] = DashboardAnalytics::resolvePmPeriod($now->year, $now->month, $now);
-        $ticketFilters = $this->incomingTicketFilters($request);
-        $exportRange = $this->exportDateRange();
-
-        $ticketsQuery = OperatorReport::query()->forDashboard();
-        if (! empty($ticketFilters['start_date'])) {
-            $ticketsQuery->whereDate('stop_date', '>=', $ticketFilters['start_date']);
-        }
-        if (! empty($ticketFilters['end_date'])) {
-            $ticketsQuery->whereDate('stop_date', '<=', $ticketFilters['end_date']);
-        }
-        if (! empty($ticketFilters['machine_number'])) {
-            $ticketsQuery->where('machine_number', (int) $ticketFilters['machine_number']);
-        }
 
         return view('admin.dashboard', [
             'machines' => $machines,
@@ -58,66 +50,124 @@ class DashboardController extends Controller
             'pmMonths' => DashboardAnalytics::monthNames(),
             'pmYear' => $pmYear,
             'pmMonth' => $pmMonth,
-            'exportStartDate' => $ticketFilters['start_date'] ?? $exportRange['start'],
-            'exportEndDate' => $ticketFilters['end_date'] ?? $exportRange['end'],
-            'ticketMachineNumber' => $ticketFilters['machine_number'] ?? null,
-            'tickets' => $ticketsQuery
-                ->paginate(TablePagination::perPage())
-                ->withQueryString(),
-            'preventiveReports' => $this->dashboardPreventiveReports($request),
-            'findingRecaps' => FindingRecap::query()
-                ->with(['machineName', 'statusNotes.user'])
-                ->priorityByDueDate()
-                ->paginate(TablePagination::perPage(), ['*'], 'recap_page')
-                ->withQueryString(),
-            'findingRecapStatusLabels' => FindingRecapStatus::labels(),
             'preventiveToday' => $this->preventiveTodayByMachine($machineNumbers),
-            'statusLabels' => RepairStatus::labels(),
+            'runningMachines' => MachineRunDay::runningMachineNumbers($now),
+            'breakdownMachines' => MachineRunDay::breakdownMachineNumbers($now),
+            'standbyMachines' => MachineRunDay::standbyMachineNumbers($now),
+            'clusterNames' => LayoutCluster::names(),
+            'technicianStatuses' => TechnicianDuty::snapshot(),
         ]);
     }
 
-    private function dashboardPreventiveReports(Request $request)
+    public function updateRunning(Request $request): JsonResponse
     {
-        $query = PreventiveReport::query()->with('machineName');
-        $orderSql = PreventiveStatus::dashboardOrderSql($request->user());
-        if ($orderSql !== null) {
-            $query->orderByRaw($orderSql);
+        abort_unless($request->user()?->canToggleMachineRunning(), 403);
+
+        $validated = $request->validate([
+            'machine_number' => ['required', 'integer', Rule::exists('machine_names', 'machine_number')],
+            'status' => ['nullable', 'required_without:running', 'in:running,breakdown,standby,off'],
+            'running' => ['nullable', 'required_without:status', 'in:0,1'],
+        ]);
+
+        $machineNumber = (int) $validated['machine_number'];
+        $status = $validated['status'] ?? ((($validated['running'] ?? '0') === '1')
+            ? MachineRunDay::STATUS_RUNNING
+            : 'off');
+        $date = MachineRunDay::todayDate();
+
+        if ($status === 'off') {
+            MachineRunDay::query()
+                ->where('machine_number', $machineNumber)
+                ->whereDate('run_date', $date)
+                ->delete();
+            $status = null;
+        } else {
+            $record = MachineRunDay::query()
+                ->where('machine_number', $machineNumber)
+                ->whereDate('run_date', $date)
+                ->first();
+
+            if ($record) {
+                $record->update([
+                    'status' => $status,
+                    'user_id' => $request->user()->id,
+                ]);
+            } else {
+                MachineRunDay::query()->create([
+                    'machine_number' => $machineNumber,
+                    'run_date' => $date,
+                    'status' => $status,
+                    'user_id' => $request->user()->id,
+                ]);
+            }
         }
 
-        return $query
-            ->latestFirst()
-            ->paginate(TablePagination::perPage(), ['*'], 'preventive_page')
-            ->withQueryString();
+        return response()->json([
+            'ok' => true,
+            'machine_number' => $machineNumber,
+            'status' => $status,
+            'running' => $status === MachineRunDay::STATUS_RUNNING,
+        ]);
     }
 
-    /**
-     * @return array{start_date?: string, end_date?: string, machine_number?: int}
-     */
-    private function incomingTicketFilters(Request $request): array
+    public function updateTechnicianShifts(Request $request): RedirectResponse
     {
-        $filters = $request->validate([
-            'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'machine_number' => ['nullable', 'integer', 'min:1', 'max:'.InjectionMachine::count()],
+        abort_unless($request->user()?->isAdmin(), 403);
+
+        $validated = $request->validate([
+            'shifts' => ['nullable', 'array'],
+            'shifts.*' => ['nullable', 'in:1,2,3,off,overtime'],
         ]);
 
-        return array_filter(
-            $filters,
-            static fn ($value) => $value !== null && $value !== ''
-        );
+        $shifts = $validated['shifts'] ?? [];
+
+        foreach (Technician::query()->active()->get() as $technician) {
+            $value = $shifts[$technician->id] ?? null;
+
+            if ($value === 'off') {
+                $technician->update(['off_duty' => true, 'overtime' => false]);
+
+                continue;
+            }
+
+            if ($value === 'overtime') {
+                $technician->update(['overtime' => true, 'off_duty' => false]);
+
+                continue;
+            }
+
+            $technician->update([
+                'shift' => ($value === null || $value === '') ? null : (int) $value,
+                'off_duty' => false,
+                'overtime' => false,
+            ]);
+        }
+
+        return redirect()
+            ->route('admin.technicians.index')
+            ->with('success', 'Mapping shift teknisi sudah disimpan.');
     }
 
-    private function exportDateRange(): array
+    public function updateClusterName(Request $request): RedirectResponse
     {
-        $today = now()->timezone('Asia/Jakarta')->format('Y-m-d');
+        abort_unless($request->user()?->isAdmin(), 403);
 
-        $oldest = MaintenanceReport::query()->orderBy('report_date')->first();
-        $newest = MaintenanceReport::query()->orderByDesc('report_date')->first();
+        $validated = $request->validate([
+            'key' => ['required', 'string', Rule::in(array_keys(LayoutCluster::DEFAULTS))],
+            'name' => ['required', 'string', 'max:80'],
+        ]);
 
-        return [
-            'start' => $oldest?->report_date->format('Y-m-d') ?? $today,
-            'end' => $newest?->report_date->format('Y-m-d') ?? $today,
-        ];
+        $name = trim((string) preg_replace('/\s+/u', ' ', $validated['name']));
+        if ($name === '') {
+            return back()->withErrors(['name' => 'Nama cluster wajib diisi.'])->withInput();
+        }
+
+        LayoutClusterName::query()->updateOrCreate(
+            ['key' => $validated['key']],
+            ['name' => $name],
+        );
+
+        return back()->with('success', 'Nama cluster sudah disimpan.');
     }
 
     public function machine(Request $request, int $machineNumber): View
@@ -125,6 +175,8 @@ class DashboardController extends Controller
         abort_unless(InjectionMachine::isValid($machineNumber), 404);
 
         $machine = MachineName::query()
+            ->with('mold')
+            ->operational()
             ->where('machine_number', $machineNumber)
             ->first();
 
@@ -149,6 +201,24 @@ class DashboardController extends Controller
             ->paginate(TablePagination::perPage())
             ->withQueryString();
 
+        $operatorTicketsQuery = OperatorReport::query()
+            ->with(['claimedTechnician', 'claimedBy'])
+            ->where('machine_number', $machineNumber)
+            ->whereDoesntHave('maintenanceReport');
+
+        if (! empty($filters['start_date'])) {
+            $operatorTicketsQuery->whereDate('stop_date', '>=', $filters['start_date']);
+        }
+
+        if (! empty($filters['end_date'])) {
+            $operatorTicketsQuery->whereDate('stop_date', '<=', $filters['end_date']);
+        }
+
+        $operatorTickets = $operatorTicketsQuery
+            ->orderByDesc('stop_date')
+            ->orderByDesc('id')
+            ->get();
+
         $preventiveQuery = PreventiveReport::query()
             ->with('machineName')
             ->where('machine_number', $machineNumber);
@@ -170,15 +240,36 @@ class DashboardController extends Controller
         return view('admin.machine-detail', [
             'machineNumber' => $machineNumber,
             'machine' => $machine,
+            'molds' => Mold::query()->active()->orderBy('name')->orderBy('id')->get(),
             'reports' => $reports,
-            'reportCount' => MaintenanceReport::where('machine_number', $machineNumber)->count(),
-            'filteredReportCount' => $reports->total(),
+            'operatorTickets' => $operatorTickets,
+            'reportCount' => MaintenanceReport::where('machine_number', $machineNumber)->count()
+                + OperatorReport::query()
+                    ->where('machine_number', $machineNumber)
+                    ->whereDoesntHave('maintenanceReport')
+                    ->count(),
+            'filteredReportCount' => $reports->total() + $operatorTickets->count(),
             'preventiveReports' => $preventiveReports,
             'preventiveCount' => PreventiveReport::where('machine_number', $machineNumber)->count(),
             'filteredPreventiveCount' => $preventiveReports->total(),
             'startDate' => $filters['start_date'] ?? null,
             'endDate' => $filters['end_date'] ?? null,
             'statusLabels' => RepairStatus::labels(),
+        ]);
+    }
+
+    public function operatorRunning(): JsonResponse
+    {
+        abort_unless(auth()->user()?->isOperator(), 403);
+
+        $machineNumbers = $this->masterMachines()->pluck('machine_number')->map(fn ($number) => (int) $number)->all();
+
+        return response()->json([
+            'running' => MachineRunDay::runningMachineNumbers(),
+            'breakdown' => MachineRunDay::breakdownMachineNumbers(),
+            'standby' => MachineRunDay::standbyMachineNumbers(),
+            'machines' => $this->machineStats($machineNumbers),
+            'updated_at' => now()->timezone('Asia/Jakarta')->format('d/m/Y H:i:s'),
         ]);
     }
 
@@ -203,6 +294,10 @@ class DashboardController extends Controller
             'updated_at' => now()->timezone('Asia/Jakarta')->format('d/m/Y H:i:s'),
             'charts' => DashboardAnalytics::charts(),
             'pm_status' => DashboardAnalytics::pmStatus($pmYear, $pmMonth),
+            'running' => MachineRunDay::runningMachineNumbers(),
+            'breakdown' => MachineRunDay::breakdownMachineNumbers(),
+            'standby' => MachineRunDay::standbyMachineNumbers(),
+            'technicians' => TechnicianDuty::snapshot(),
         ]);
     }
 
@@ -242,9 +337,28 @@ class DashboardController extends Controller
         ];
     }
 
+    public function updateMold(Request $request, int $machineNumber): RedirectResponse
+    {
+        abort_unless($request->user()?->isProduksiInjection(), 403);
+        abort_unless(InjectionMachine::isValid($machineNumber), 404);
+
+        $validated = $request->validate([
+            'mold_id' => ['nullable', 'integer', Rule::exists('molds', 'id')->where('is_active', true)],
+        ]);
+
+        $machine = MachineName::query()->operational()->where('machine_number', $machineNumber)->firstOrFail();
+        $machine->update(['mold_id' => $validated['mold_id'] ?? null]);
+
+        return redirect()
+            ->route('admin.machines.show', $machineNumber)
+            ->with('success', 'Mold yang terpasang di mesin ini sudah diperbarui.');
+    }
+
     private function masterMachines()
     {
         return MachineName::query()
+            ->with('mold')
+            ->operational()
             ->active()
             ->whereNotNull('machine_number')
             ->orderBy('machine_number')
@@ -257,101 +371,7 @@ class DashboardController extends Controller
      */
     private function machineStats(array $machineNumbers): array
     {
-        $opRows = OperatorReport::query()
-            ->where('status', '!=', RepairStatus::CLOSE)
-            ->selectRaw('machine_number, status, COUNT(*) as total')
-            ->groupBy('machine_number', 'status')
-            ->get();
-
-        $opTotals = [];
-        $opActive = [];
-        $opPending = [];
-        foreach ($opRows as $row) {
-            $number = (int) $row->machine_number;
-            $total = (int) $row->total;
-            $opTotals[$number] = ($opTotals[$number] ?? 0) + $total;
-            if (in_array($row->status, RepairStatus::machineStopValues(), true)) {
-                $opActive[$number] = ($opActive[$number] ?? 0) + $total;
-            }
-            if (in_array($row->status, RepairStatus::pendingMaintenanceCloseValues(), true)) {
-                $opPending[$number] = ($opPending[$number] ?? 0) + $total;
-            }
-        }
-
-        $findingCounts = FindingRecap::query()
-            ->where('status', '!=', FindingRecapStatus::CLOSE)
-            ->selectRaw('machine_number, COUNT(*) as total')
-            ->groupBy('machine_number')
-            ->pluck('total', 'machine_number');
-
-        $pmDueDates = $this->nearestPmDueDates($machineNumbers);
-
-        $stats = [];
-        foreach ($machineNumbers as $number) {
-            $number = (int) $number;
-            $findings = (int) ($findingCounts[$number] ?? 0);
-            $stats[$number] = [
-                'op' => (int) ($opTotals[$number] ?? 0),
-                'findings' => $findings,
-                'pm_due' => $pmDueDates[$number] ?? null,
-                'alert' => RepairStatus::machineCardAlert(
-                    (int) ($opActive[$number] ?? 0),
-                    (int) ($opPending[$number] ?? 0),
-                    $findings
-                ),
-            ];
-        }
-
-        return $stats;
-    }
-
-    /**
-     * @param  list<int>  $machineNumbers
-     * @return array<int, string>
-     */
-    private function nearestPmDueDates(array $machineNumbers): array
-    {
-        if ($machineNumbers === []) {
-            return [];
-        }
-
-        $today = now()->timezone('Asia/Jakarta')->toDateString();
-        $open = PreventiveSchedule::query()
-            ->open()
-            ->whereIn('machine_number', $machineNumbers)
-            ->get(['machine_number', 'plan_date']);
-
-        $dates = [];
-        foreach ($machineNumbers as $number) {
-            $forMachine = $open->filter(
-                fn (PreventiveSchedule $schedule): bool => (int) $schedule->machine_number === (int) $number
-            );
-
-            if ($forMachine->isEmpty()) {
-                continue;
-            }
-
-            $upcoming = $forMachine
-                ->filter(fn (PreventiveSchedule $schedule): bool => $schedule->plan_date->toDateString() >= $today)
-                ->sortBy(fn (PreventiveSchedule $schedule): string => $schedule->plan_date->toDateString())
-                ->first();
-
-            if ($upcoming) {
-                $dates[(int) $number] = $upcoming->plan_date->format('d/m/Y');
-                continue;
-            }
-
-            $overdue = $forMachine
-                ->filter(fn (PreventiveSchedule $schedule): bool => $schedule->plan_date->toDateString() < $today)
-                ->sortByDesc(fn (PreventiveSchedule $schedule): string => $schedule->plan_date->toDateString())
-                ->first();
-
-            if ($overdue) {
-                $dates[(int) $number] = $overdue->plan_date->format('d/m/Y');
-            }
-        }
-
-        return $dates;
+        return MachineCardBoard::stats($machineNumbers);
     }
 
     /**
@@ -360,33 +380,6 @@ class DashboardController extends Controller
      */
     private function preventiveTodayByMachine(array $machineNumbers): array
     {
-        $today = now()->timezone('Asia/Jakarta')->toDateString();
-        $map = [];
-        foreach ($machineNumbers as $number) {
-            $map[(int) $number] = [];
-        }
-
-        if ($machineNumbers === []) {
-            return $map;
-        }
-
-        $rows = PreventiveReport::query()
-            ->whereDate('work_date', $today)
-            ->whereIn('machine_number', $machineNumbers)
-            ->orderBy('id')
-            ->get(['machine_number', 'category']);
-
-        foreach ($rows as $row) {
-            $number = (int) $row->machine_number;
-            $category = $row->category_label;
-            if ($category === '-' || $category === '') {
-                continue;
-            }
-            if (! in_array($category, $map[$number], true)) {
-                $map[$number][] = $category;
-            }
-        }
-
-        return $map;
+        return MachineCardBoard::preventiveToday($machineNumbers);
     }
 }

@@ -14,7 +14,7 @@ class MachineQrController extends Controller
 {
     public function image(int $machineNumber): Response
     {
-        abort_unless(auth()->user()?->seesFullDashboard(), 403);
+        abort_unless(auth()->user()?->seesAdminDashboard(), 403);
         abort_unless(InjectionMachine::isValid($machineNumber), 404);
 
         return response(MachineQrCode::png($machineNumber), 200, [
@@ -25,7 +25,7 @@ class MachineQrController extends Controller
 
     public function download(int $machineNumber): Response
     {
-        abort_unless(auth()->user()?->seesFullDashboard(), 403);
+        abort_unless(auth()->user()?->seesAdminDashboard(), 403);
         abort_unless(InjectionMachine::isValid($machineNumber), 404);
 
         return response(MachineQrCode::png($machineNumber), 200, [
@@ -36,9 +36,10 @@ class MachineQrController extends Controller
 
     public function downloadAll(): StreamedResponse
     {
-        abort_unless(auth()->user()?->seesFullDashboard(), 403);
+        abort_unless(auth()->user()?->seesAdminDashboard(), 403);
 
         $numbers = MachineName::query()
+            ->operational()
             ->active()
             ->whereNotNull('machine_number')
             ->orderBy('machine_number')

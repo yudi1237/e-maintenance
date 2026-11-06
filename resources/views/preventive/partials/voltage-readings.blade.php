@@ -3,7 +3,7 @@
 @endphp
 <div class="em-form-section overflow-hidden !p-0">
     <div class="overflow-x-auto">
-        <table class="min-w-full text-sm border-collapse">
+        <table class="w-full text-sm border-collapse" style="min-width:40rem;">
             <tbody>
                 <tr class="bg-yellow-200 dark:bg-yellow-500/25">
                     <th class="px-3 py-3 text-left font-semibold text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-yellow-500/30 whitespace-nowrap">Tegangan Utama</th>
@@ -14,7 +14,7 @@
                                 <input
                                     type="text"
                                     name="readings[{{ $key }}]"
-                                    value="{{ old('readings.'.$key) }}"
+                                    value="{{ old('readings.'.$key, ($savedReadings ?? [])[$key] ?? '') }}"
                                     placeholder="{{ $fields[$key]['input']['placeholder'] ?? '' }}"
                                     maxlength="50"
                                     required
@@ -25,6 +25,14 @@
                             @error('readings.'.$key)
                                 <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
                             @enderror
+                            <input
+                                type="text"
+                                name="remarks[{{ $key }}]"
+                                value="{{ old('remarks.'.$key, ($savedRemarks ?? [])[$key] ?? '') }}"
+                                maxlength="500"
+                                placeholder="Remarks"
+                                class="em-input-light mt-1 w-full py-1 text-xs bg-yellow-50 dark:bg-yellow-500/10"
+                            >
                         </td>
                     @endforeach
                 </tr>
@@ -35,7 +43,7 @@
                             <input
                                 type="text"
                                 name="readings[voltage_power_supply]"
-                                value="{{ old('readings.voltage_power_supply') }}"
+                                value="{{ old('readings.voltage_power_supply', ($savedReadings ?? [])['voltage_power_supply'] ?? '') }}"
                                 placeholder="{{ $fields['voltage_power_supply']['input']['placeholder'] ?? '' }}"
                                 maxlength="50"
                                 required
@@ -46,6 +54,14 @@
                         @error('readings.voltage_power_supply')
                             <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
                         @enderror
+                        <input
+                            type="text"
+                            name="remarks[voltage_power_supply]"
+                            value="{{ old('remarks.voltage_power_supply', ($savedRemarks ?? [])['voltage_power_supply'] ?? '') }}"
+                            maxlength="500"
+                            placeholder="Remarks"
+                            class="em-input-light mt-1 w-full max-w-xs py-1 text-xs bg-yellow-50 dark:bg-yellow-500/10"
+                        >
                     </td>
                 </tr>
             </tbody>

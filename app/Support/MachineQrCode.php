@@ -32,6 +32,14 @@ class MachineQrCode
         ]);
     }
 
+    public static function inputOpUrl(int $machineNumber): string
+    {
+        return route('scan.operator-reports.create', [
+            'machineNumber' => $machineNumber,
+            'token' => self::token($machineNumber),
+        ]);
+    }
+
     public static function png(int $machineNumber, int $size = 480, bool $withCaption = true): string
     {
         $png = self::build($machineNumber, $size)->getString();
@@ -62,6 +70,7 @@ class MachineQrCode
     public static function captionLines(int $machineNumber): array
     {
         $machine = MachineName::query()
+            ->operational()
             ->where('machine_number', $machineNumber)
             ->first();
 

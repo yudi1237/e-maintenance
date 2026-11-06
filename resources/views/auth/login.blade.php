@@ -65,4 +65,5 @@
             Masuk ke sistem
         </button>
     </form>
+    <a href="{{ route('area-op.create') }}" class="mt-4 block text-center text-sm font-semibold text-cyan-700 hover:text-cyan-600 dark:text-cyan-300">Input OP Area</a>
 </x-guest-layout>

@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-white leading-tight">Kelola Pengguna</h2>
+        <h2 class="font-semibold text-xl text-gray-800 dark:text-white leading-tight">User Login</h2>
     </x-slot>
 
     <div
@@ -72,6 +72,7 @@
                                 <th class="px-4 py-3 text-left">Nama</th>
                                 <th class="px-4 py-3 text-left">NPK</th>
                                 <th class="px-4 py-3 text-left">Peran</th>
+                                <th class="px-4 py-3 text-left">MFA</th>
                                 <th class="px-4 py-3 text-right">Aksi</th>
                             </tr>
                         </thead>
@@ -85,6 +86,13 @@
                                             {{ $user->isTechnician() ? 'Teknisi Maintenance' : $user->roleLabel() }}
                                         </span>
                                     </td>
+                                    <td class="px-4 py-3">
+                                        @if (method_exists($user, 'hasTwoFactorEnabled') && $user->hasTwoFactorEnabled())
+                                            <span class="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Aktif</span>
+                                        @else
+                                            <span class="text-xs text-slate-500">Belum</span>
+                                        @endif
+                                    </td>
                                     <td class="px-4 py-3 text-right whitespace-nowrap">
                                         <button
                                             type="button"
@@ -93,6 +101,12 @@
                                         >
                                             Edit
                                         </button>
+                                        @if (method_exists($user, 'hasTwoFactorEnabled') && $user->hasTwoFactorEnabled() && \Illuminate\Support\Facades\Route::has('admin.users.reset-mfa'))
+                                            <form method="POST" action="{{ route('admin.users.reset-mfa', $user) }}" class="inline ms-3" onsubmit="return confirm('Reset Google Authenticator untuk pengguna ini?')">
+                                                @csrf
+                                                <button type="submit" class="text-amber-600 text-xs font-semibold hover:underline">Reset MFA</button>
+                                            </form>
+                                        @endif
                                         @if ($user->id !== auth()->id())
                                             <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="inline ms-3" onsubmit="return confirm('Hapus pengguna?')">
                                                 @csrf @method('DELETE')

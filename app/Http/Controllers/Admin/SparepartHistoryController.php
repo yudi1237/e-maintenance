@@ -21,6 +21,7 @@ class SparepartHistoryController extends Controller
             'rows' => SparepartHistory::paginate($request),
             'filters' => $this->filters($request),
             'machineNumbers' => MachineName::query()
+                ->operational()
                 ->active()
                 ->whereNotNull('machine_number')
                 ->orderBy('machine_number')

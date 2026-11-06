@@ -82,5 +82,6 @@ class DatabaseSeeder extends Seeder
         $this->call(PreventiveChecklistSeeder::class);
         $this->call(DemoDashboardSeeder::class);
         $this->call(PreventiveApprovalDemoSeeder::class);
+        $this->call(PreventiveScheduleDemoSeeder::class);
     }
 }

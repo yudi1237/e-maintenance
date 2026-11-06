@@ -27,7 +27,7 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <style>[x-cloak]{display:none!important}</style>
-        @if (request()->routeIs('login'))
+        @if (request()->routeIs('login', 'mfa.*') || request()->is('/'))
             <style>
                 .em-login-brand {
                     position: absolute;
@@ -60,7 +60,7 @@
         @endif
     </head>
     <body class="font-sans text-gray-900 antialiased dark:bg-slate-950 dark:text-slate-100">
-        @php $isLogin = request()->routeIs('login'); @endphp
+        @php $isLogin = request()->routeIs('login', 'mfa.*') || request()->is('/'); @endphp
         <div class="{{ $isLogin ? 'em-login-shell' : 'min-h-screen flex flex-col bg-gray-100 dark:bg-slate-950' }}">
             @if ($isLogin)
                 <div class="em-login-photo" aria-hidden="true">

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Exports\PreventiveReportXlsxExport;
+use App\Exports\PreventiveReportPdf;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdatePreventiveReportStatusRequest;
 use App\Models\MachineName;
@@ -30,7 +30,14 @@ class PreventiveReportController extends Controller
             'schedule_category' => ['nullable', 'string', Rule::in(array_keys(PreventiveCategory::scheduleGroupLabels()))],
         ]);
 
-        $reportsQuery = PreventiveReport::query()->with('machineName');
+        abort_unless($request->user()?->canOpenPreventiveBoard(), 403);
+
+        $reportsQuery = PreventiveReport::query()->with([
+            'machineName',
+            'injectionApprover',
+            'qualityApprover',
+            'maintenanceApprover',
+        ]);
 
         if (! empty($filters['start_date'])) {
             $reportsQuery->whereDate('work_date', '>=', $filters['start_date']);
@@ -55,6 +62,7 @@ class PreventiveReportController extends Controller
             ->withQueryString();
 
         $machines = MachineName::query()
+            ->operational()
             ->whereNotNull('machine_number')
             ->where('is_active', true)
             ->orderBy('machine_number')
@@ -108,7 +116,12 @@ class PreventiveReportController extends Controller
     {
         abort_unless(auth()->user()?->seesPreventiveResults(), 403);
 
-        $preventiveReport->load('machineName');
+        $preventiveReport->load([
+            'machineName',
+            'injectionApprover',
+            'qualityApprover',
+            'maintenanceApprover',
+        ]);
 
         return view('admin.preventive.show', [
             'report' => $preventiveReport,
@@ -118,7 +131,12 @@ class PreventiveReportController extends Controller
     public function updateStatus(UpdatePreventiveReportStatusRequest $request, PreventiveReport $preventiveReport): RedirectResponse
     {
         $status = $request->validated('status');
-        $preventiveReport->update(['status' => $status]);
+        $payload = ['status' => $status];
+        $approverColumn = PreventiveStatus::approvalActorColumn($status);
+        if ($approverColumn !== null) {
+            $payload[$approverColumn] = $request->user()->id;
+        }
+        $preventiveReport->update($payload);
 
         return back()->with(
             'success',
@@ -129,29 +147,14 @@ class PreventiveReportController extends Controller
     public function export(PreventiveReport $preventiveReport): StreamedResponse
     {
         $preventiveReport->load(['machineName', 'equipment', 'robot']);
-        $export = new PreventiveReportXlsxExport;
+        $export = new PreventiveReportPdf;
         $filename = $export->filename($preventiveReport);
+        $binary = $export->output($preventiveReport);
 
-        return response()->streamDownload(function () use ($export, $preventiveReport) {
-            $tmp = tempnam(sys_get_temp_dir(), 'xlsx_');
-            if ($tmp === false) {
-                throw new \RuntimeException('Tidak dapat membuat file sementara untuk export Excel.');
-            }
-
-            $path = $tmp.'.xlsx';
-            if (! rename($tmp, $path)) {
-                @unlink($tmp);
-                throw new \RuntimeException('Tidak dapat menyiapkan file export Excel.');
-            }
-
-            try {
-                $export->buildExporter($preventiveReport)->writeToFile($path);
-                readfile($path);
-            } finally {
-                @unlink($path);
-            }
+        return response()->streamDownload(function () use ($binary) {
+            echo $binary;
         }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Type' => 'application/pdf',
         ]);
     }
 }

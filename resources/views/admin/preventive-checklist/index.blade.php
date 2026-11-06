@@ -1,7 +1,4 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-white leading-tight">Master Data Preventive</h2>
-    </x-slot>
     <style>
         .em-checklist-compact { padding-top: 1rem; padding-bottom: 1rem; }
         .em-checklist-compact .em-shell { row-gap: 0.75rem; }
@@ -26,11 +23,37 @@
         $denseText = '!mt-0 !min-h-0 h-7 w-full rounded-md px-1.5 py-0 text-xs shadow-none';
     @endphp
 
-    <div class="em-checklist-compact py-4" x-data="{ showForm: {{ old('create_item') ? 'true' : 'false' }} }">
+    <div
+        class="em-checklist-compact"
+        x-data="{ showForm: {{ old('create_item') ? 'true' : 'false' }}, showCreateCategory: {{ old('create_category') || $errors->has('label') ? 'true' : 'false' }}, showEditCategory: {{ old('edit_category') || $errors->has('edit_label') ? 'true' : 'false' }} }"
+    >
+        <div class="border-b border-slate-200 bg-white dark:border-white/5 dark:bg-slate-900/60">
+            <div class="em-shell flex flex-wrap items-center justify-between gap-3 py-4">
+                <h2 class="font-semibold text-xl text-gray-800 dark:text-white leading-tight">Check Sheet</h2>
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                    <button type="button" class="em-btn-secondary !min-h-0 !w-auto !px-3 !py-1.5 !text-xs" @click="showCreateCategory = ! showCreateCategory; if (showCreateCategory) { showEditCategory = false; showForm = false }">Tambah Kategori Preventive</button>
+                    <button type="button" class="em-btn-secondary !min-h-0 !w-auto !px-3 !py-1.5 !text-xs" @click="showEditCategory = ! showEditCategory; if (showEditCategory) { showCreateCategory = false; showForm = false }">Edit Kategori Preventive</button>
+                    @if ($category !== '')
+                        <form method="POST" action="{{ route('admin.preventive-checklist.categories.destroy') }}" onsubmit="return confirm({{ \Illuminate\Support\Js::from('Hapus kategori preventive '.($categories[$category] ?? $category).' beserta item check sheet-nya?') }})">
+                            @csrf
+                            @method('DELETE')
+                            <input type="hidden" name="code" value="{{ $category }}">
+                            <button type="submit" class="em-btn-secondary !min-h-0 !w-auto !px-3 !py-1.5 !text-xs" style="color:#dc2626;border-color:#fca5a5">Delete Kategori</button>
+                        </form>
+                    @endif
+                    @if ($category !== '')
+                        <a href="{{ route('admin.preventive-checklist.export', ['category' => $category]) }}" class="em-btn-secondary !min-h-0 !w-auto !px-3 !py-1.5 !text-xs">Download Check Sheet</a>
+                    @endif
+                    <button type="button" class="em-btn-primary !min-h-0 !w-auto !px-3 !py-1.5 !text-xs" @click="showForm = ! showForm; if (showForm) { showCreateCategory = false; showEditCategory = false }">Tambah Item Check Sheet</button>
+                </div>
+            </div>
+        </div>
+        <div class="py-4">
         <div class="em-shell space-y-3">
             <x-alert />
 
-            <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+                <p class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Kategori Preventive</p>
                 <div class="flex flex-wrap gap-1.5">
                     @foreach ($categories as $value => $label)
                         <a href="{{ route('admin.preventive-checklist.index', ['category' => $value]) }}"
@@ -39,19 +62,41 @@
                         </a>
                     @endforeach
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <a
-                        href="{{ route('admin.preventive-checklist.export', ['category' => $category]) }}"
-                        class="em-btn-secondary !min-h-0 !w-auto !px-3 !py-1.5 !text-xs"
-                    >
-                        Download Check Sheet
-                    </a>
-                    <button
-                        type="button"
-                        class="em-btn-primary !min-h-0 !w-auto !px-3 !py-1.5 !text-xs"
-                        @click="showForm = ! showForm"
-                    >Tambah Item Check Sheet</button>
-                </div>
+            </div>
+
+            <div class="em-glass rounded-xl p-3" x-show="showCreateCategory" x-cloak>
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Tambah Kategori Preventive</h3>
+                <form method="POST" action="{{ route('admin.preventive-checklist.categories.store') }}" class="mt-2 flex flex-wrap items-end gap-2">
+                    @csrf
+                    <input type="hidden" name="create_category" value="1">
+                    <div class="min-w-[16rem] flex-1">
+                        <label for="new_category_label" class="text-xs font-medium text-slate-600 dark:text-slate-300">Nama kategori preventive</label>
+                        <input id="new_category_label" name="label" value="{{ old('label') }}" required maxlength="150" class="{{ $denseInput }} mt-1 w-full">
+                        @error('label')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <button type="submit" class="em-btn-primary !min-h-0 !w-auto !px-3 !py-1.5 !text-xs">Simpan</button>
+                </form>
+            </div>
+
+            <div class="em-glass rounded-xl p-3" x-show="showEditCategory" x-cloak>
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-white">Edit Kategori Preventive</h3>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Mengubah nama yang tampil. Item check sheet pada kategori ini tetap tersimpan.</p>
+                <form method="POST" action="{{ route('admin.preventive-checklist.categories.update') }}" class="mt-2 flex flex-wrap items-end gap-2">
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="edit_category" value="1">
+                    <input type="hidden" name="code" value="{{ $category }}">
+                    <div class="min-w-[16rem] flex-1">
+                        <label for="edit_category_label" class="text-xs font-medium text-slate-600 dark:text-slate-300">Nama kategori preventive</label>
+                        <input id="edit_category_label" name="edit_label" value="{{ old('edit_label', $categories[$category] ?? $category) }}" required maxlength="150" class="{{ $denseInput }} mt-1 w-full">
+                        @error('edit_label')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <button type="submit" class="em-btn-primary !min-h-0 !w-auto !px-3 !py-1.5 !text-xs">Simpan Nama</button>
+                </form>
             </div>
 
             <div class="em-glass rounded-xl p-3" x-show="showForm" x-cloak>
@@ -207,6 +252,7 @@
                     </table>
                 </div>
             </div>
+        </div>
         </div>
     </div>
 </x-app-layout>

@@ -18,6 +18,7 @@ class MachineNameXlsxExport
 
         $exporter->addRow([
             'No Mesin',
+            'Plant',
             'No Asset',
             'Brand',
             'Machine Model',
@@ -40,11 +41,13 @@ class MachineNameXlsxExport
             'Catatan',
             'Jumlah Foto',
             'Status',
+            'Severity/Kondisi',
         ]);
 
         foreach ($machines as $machine) {
             $exporter->addRow([
                 $machine->machine_number,
+                MachineName::plantOptions()[$machine->plant] ?? $machine->plant,
                 $machine->asset_number,
                 $machine->brand,
                 $machine->machine_model,
@@ -67,6 +70,9 @@ class MachineNameXlsxExport
                 $machine->specification,
                 is_array($machine->machine_photos) ? count($machine->machine_photos) : 0,
                 $machine->is_active ? 'Aktif' : 'Nonaktif',
+                collect(MachineName::severityOptions())
+                    ->only($machine->severity_conditions ?? [])
+                    ->implode(', '),
             ]);
         }
 

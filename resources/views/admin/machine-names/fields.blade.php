@@ -9,6 +9,7 @@
         <thead class="hidden md:table-header-group">
             <tr class="bg-sky-200 text-center text-xs font-semibold text-slate-800 dark:bg-sky-900/70 dark:text-sky-100">
                 <x-admin.spreadsheet-th>No</x-admin.spreadsheet-th>
+                <x-admin.spreadsheet-th>Plant</x-admin.spreadsheet-th>
                 <x-admin.spreadsheet-th>No Mesin</x-admin.spreadsheet-th>
                 <x-admin.spreadsheet-th>No Asset Mesin</x-admin.spreadsheet-th>
                 <x-admin.spreadsheet-th>Brand</x-admin.spreadsheet-th>
@@ -23,6 +24,14 @@
             <tr class="block rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900/40 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
                 <x-admin.spreadsheet-td label="No">
                     <span class="inline-flex min-h-[40px] min-w-[2.5rem] items-center justify-center font-semibold text-slate-800 dark:text-slate-100">1</span>
+                </x-admin.spreadsheet-td>
+                <x-admin.spreadsheet-td label="Plant">
+                    <select id="plant" name="plant" class="{{ $cellInput }}" required>
+                        @foreach (\App\Models\MachineName::plantOptions() as $plantValue => $plantLabel)
+                            <option value="{{ $plantValue }}" @selected($value('plant', $defaultPlant ?? \App\Models\MachineName::PLANT_CIKARANG) === $plantValue)>{{ $plantLabel }}</option>
+                        @endforeach
+                    </select>
+                    <x-input-error :messages="$errors->get('plant')" class="mt-1" />
                 </x-admin.spreadsheet-td>
                 <x-admin.spreadsheet-td label="No Mesin">
                     <input id="machine_number" name="machine_number" type="number" min="1" max="{{ config('maintenance.machine_count', 60) }}" class="{{ $cellInput }}" value="{{ $value('machine_number') }}" required>
@@ -175,4 +184,17 @@
             </tr>
         </tbody>
     </table>
+</div>
+
+<div class="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+    <label for="severity_condition" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Severity/Kondisi</label>
+    @php
+        $selectedSeverity = old('severity_condition', data_get($machine?->severity_conditions, 0, ''));
+    @endphp
+    <select id="severity_condition" name="severity_condition" class="em-input mt-2 max-w-xs">
+        <option value="">—</option>
+        @foreach (\App\Models\MachineName::severityOptions() as $severityValue => $severityLabel)
+            <option value="{{ $severityValue }}" @selected($selectedSeverity === $severityValue)>{{ $severityLabel }}</option>
+        @endforeach
+    </select>
 </div>

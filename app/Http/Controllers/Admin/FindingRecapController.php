@@ -150,6 +150,7 @@ class FindingRecapController extends Controller
     private function formData(?FindingRecap $recap = null): array
     {
         $machines = MachineName::query()
+            ->operational()
             ->whereNotNull('machine_number')
             ->where(function ($query) use ($recap) {
                 $query->where('is_active', true);

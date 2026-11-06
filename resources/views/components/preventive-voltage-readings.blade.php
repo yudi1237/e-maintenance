@@ -1,3 +1,4 @@
+@props(['group', 'readings' => [], 'remarks' => []])
 @php
     $fields = $group['items'];
 @endphp
@@ -12,6 +13,9 @@
                             <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $label }} :</span>
                             {{ $readings[$key] ?? '—' }}
                             <span class="text-xs text-slate-500">VAC</span>
+                            @if (filled($remarks[$key] ?? null))
+                                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">Remarks: {{ $remarks[$key] }}</p>
+                            @endif
                         </td>
                     @endforeach
                 </tr>
@@ -20,6 +24,9 @@
                     <td class="px-3 py-3 border border-slate-300 dark:border-yellow-500/30 text-slate-800 dark:text-white" colspan="4">
                         {{ $readings['voltage_power_supply'] ?? '—' }}
                         <span class="text-xs text-slate-500">VDC</span>
+                        @if (filled($remarks['voltage_power_supply'] ?? null))
+                            <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">Remarks: {{ $remarks['voltage_power_supply'] }}</p>
+                        @endif
                     </td>
                 </tr>
             </tbody>

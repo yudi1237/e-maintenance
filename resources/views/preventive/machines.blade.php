@@ -55,7 +55,7 @@
                     </a>
                 @empty
                     <div class="col-span-full em-glass rounded-2xl p-6 text-center text-sm text-slate-400">
-                        Belum ada master mesin. Tambahkan data di menu Master Data Mesin.
+                        Belum ada master mesin. Tambahkan data di menu Asset → Data Mesin.
                     </div>
                 @endforelse
             </div>

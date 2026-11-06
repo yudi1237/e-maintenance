@@ -64,4 +64,69 @@ class EquipmentCategory
 
         return $mapped !== null && $mapped !== self::ROBOT;
     }
+
+    /** @return array<string, string> */
+    public static function typeOptions(): array
+    {
+        return [
+            'assy' => 'ASSY',
+            'autoloader' => 'AUTOLOADER',
+            'blower' => 'BLOWER',
+            'chiller' => 'CHILLER',
+            'compatta' => 'COMPATTA',
+            'compressor' => 'COMPRESSOR',
+            self::DEHUM => 'DEHUM',
+            'dryer' => 'DRYER',
+            'ekstruder' => 'EKSTRUDER',
+            self::HOPPER => 'HOPPER',
+            'hot_runner' => 'HOT RUNNER',
+            'jig' => 'JIG',
+            'mesin_crusher' => 'MESIN CRUSHER',
+            'motor' => 'MOTOR',
+            self::MTC => 'MTC',
+            'pompa' => 'POMPA',
+            self::ROBOT => 'ROBOT',
+            'squencer' => 'SQUENCER',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function typeValues(): array
+    {
+        return array_keys(self::typeOptions());
+    }
+
+    public static function typeLabel(?string $type): string
+    {
+        return self::typeOptions()[$type] ?? self::label($type);
+    }
+
+    /** @return array<string, string> */
+    public static function areaOptions(): array
+    {
+        return [
+            'assembling' => 'ASSEMBLING',
+            'compounding' => 'COMPOUNDING',
+            'double_seat' => 'DOUBLE SEAT',
+            'injection_line' => 'INJECTION LINE',
+            'painting_line_1' => 'PAINTING LINE 1',
+            'painting_line_2' => 'PAINTING LINE 2',
+            'painting_line_3' => 'PAINTING LINE 3',
+            'utility_room' => 'UTILITY ROOM',
+            'lain_lain' => 'LAIN-LAIN',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function areaValues(): array
+    {
+        return array_keys(self::areaOptions());
+    }
+
+    public static function areaLabel(?string $area): string
+    {
+        return self::areaOptions()[$area]
+            ?? ['cooling_tower' => 'Cooling Tower'][$area]
+            ?? (string) $area;
+    }
 }

@@ -64,9 +64,8 @@ class OperatorReport extends Model
     {
         return $query
             ->with(['machineName', 'claimedBy', 'claimedTechnician', 'maintenanceReport'])
-            ->where('status', '!=', RepairStatus::CLOSE)
-            ->orderByRaw(RepairStatus::boardOrderSql())
-            ->latest();
+            ->orderByRaw(RepairStatus::dashboardTicketOrderSql(auth()->user()))
+            ->orderByDesc('id');
     }
 
     public function scopeForDashboard(Builder $query, ?User $user = null): Builder
@@ -74,8 +73,14 @@ class OperatorReport extends Model
         $orderSql = RepairStatus::dashboardTicketOrderSql($user ?? auth()->user());
 
         $query
-            ->with(['machineName', 'claimedBy', 'claimedTechnician', 'maintenanceReport'])
-            ->where('status', '!=', RepairStatus::CLOSE);
+            ->with([
+                'machineName',
+                'claimedBy',
+                'claimedTechnician',
+                'maintenanceReport.injectionApprover',
+                'maintenanceReport.qualityApprover',
+                'maintenanceReport.maintenanceApprover',
+            ]);
 
         if ($orderSql !== null) {
             $query->orderByRaw($orderSql);

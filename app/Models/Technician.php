@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\WorkShift;
 use Database\Factories\TechnicianFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +20,9 @@ class Technician extends Model
         'npk',
         'pin',
         'is_active',
+        'shift',
+        'off_duty',
+        'overtime',
     ];
 
     protected $hidden = [
@@ -30,6 +34,9 @@ class Technician extends Model
         return [
             'pin' => 'hashed',
             'is_active' => 'boolean',
+            'shift' => 'integer',
+            'off_duty' => 'boolean',
+            'overtime' => 'boolean',
         ];
     }
 
@@ -43,6 +50,31 @@ class Technician extends Model
         return $query->where('is_active', true);
     }
 
+    public function scopeOnCurrentShift(Builder $query): Builder
+    {
+        $current = WorkShift::currentNumber();
+
+        return $query->where('off_duty', false)->where(function (Builder $query) use ($current) {
+            $query->where('shift', $current)
+                ->orWhere(function (Builder $query) use ($current) {
+                    $query->where('overtime', true)
+                        ->where('shift', WorkShift::previousNumber($current));
+                });
+        });
+    }
+
+    public function isOnShift(): bool
+    {
+        if ($this->off_duty || ! in_array((int) $this->shift, [1, 2, 3], true)) {
+            return false;
+        }
+
+        $current = WorkShift::currentNumber();
+
+        return (int) $this->shift === $current
+            || ($this->overtime && WorkShift::nextNumber((int) $this->shift) === $current);
+    }
+
     public function pinMatches(string $pin): bool
     {
         return Hash::check($pin, (string) $this->getRawOriginal('pin'));
@@ -51,5 +83,24 @@ class Technician extends Model
     public function optionLabel(): string
     {
         return $this->name.' · NPK '.$this->npk;
+    }
+
+    /**
+     * @param  list<int|string>  $ids
+     * @return list<array{id: int, name: string}>
+     */
+    public static function teamSnapshot(array $ids): array
+    {
+        return self::query()
+            ->active()
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (self $technician) => [
+                'id' => $technician->id,
+                'name' => $technician->optionLabel(),
+            ])
+            ->values()
+            ->all();
     }
 }

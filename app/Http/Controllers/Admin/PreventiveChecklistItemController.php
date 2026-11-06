@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\PreventiveChecklistXlsxExport;
 use App\Http\Controllers\Controller;
+use App\Models\PreventiveCategoryRecord;
 use App\Models\PreventiveChecklistItem;
 use App\Support\PreventiveCategory;
 use App\Support\PreventiveConveyorChecklist;
@@ -12,8 +13,10 @@ use App\Support\PreventivePm1Checklist;
 use Database\Seeders\PreventiveChecklistSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -123,6 +126,76 @@ class PreventiveChecklistItemController extends Controller
             ->with('success', 'Item check sheet berhasil diperbarui.');
     }
 
+    public function storeCategory(Request $request): RedirectResponse
+    {
+        PreventiveCategoryRecord::ensureBuiltin();
+
+        $label = trim((string) $request->validate([
+            'label' => ['required', 'string', 'max:150'],
+        ])['label']);
+
+        if ($this->labelExists($label)) {
+            throw ValidationException::withMessages([
+                'label' => 'Kategori preventive sudah ada.',
+            ]);
+        }
+
+        $code = $this->codeFromLabel($label);
+        PreventiveCategoryRecord::query()->create([
+            'code' => $code,
+            'label' => $label,
+            'sort_order' => (int) PreventiveCategoryRecord::query()->max('sort_order') + 1,
+        ]);
+
+        return redirect()
+            ->route('admin.preventive-checklist.index', ['category' => $code])
+            ->with('success', 'Kategori preventive berhasil ditambahkan.');
+    }
+
+    public function updateCategory(Request $request): RedirectResponse
+    {
+        PreventiveCategoryRecord::ensureBuiltin();
+
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:30'],
+            'edit_label' => ['required', 'string', 'max:150'],
+        ]);
+        $label = trim($validated['edit_label']);
+        $record = PreventiveCategoryRecord::query()->where('code', $validated['code'])->firstOrFail();
+
+        if ($this->labelExists($label, $record->id)) {
+            throw ValidationException::withMessages([
+                'edit_label' => 'Nama kategori preventive sudah dipakai.',
+            ]);
+        }
+
+        $record->update(['label' => $label]);
+
+        return redirect()
+            ->route('admin.preventive-checklist.index', ['category' => $record->code])
+            ->with('success', 'Nama kategori preventive berhasil diubah.');
+    }
+
+    public function destroyCategory(Request $request): RedirectResponse
+    {
+        $code = (string) $request->validate([
+            'code' => ['required', 'string', 'max:30'],
+        ])['code'];
+        $record = PreventiveCategoryRecord::query()->where('code', $code)->firstOrFail();
+        $label = $record->label;
+
+        DB::transaction(function () use ($record): void {
+            PreventiveChecklistItem::query()->where('category', $record->code)->delete();
+            $record->delete();
+        });
+
+        $next = PreventiveCategoryRecord::query()->orderBy('sort_order')->orderBy('id')->value('code');
+
+        return redirect()
+            ->route('admin.preventive-checklist.index', $next ? ['category' => $next] : [])
+            ->with('success', 'Kategori preventive '.$label.' berhasil dihapus.');
+    }
+
     public function destroy(PreventiveChecklistItem $preventiveChecklistItem): RedirectResponse
     {
         $category = $preventiveChecklistItem->category;
@@ -186,7 +259,11 @@ class PreventiveChecklistItemController extends Controller
 
     private function ensureCategoryImported(string $category): void
     {
-        if (PreventiveChecklistItem::query()->where('category', $category)->exists()) {
+        if ($category === '' || PreventiveChecklistItem::query()->where('category', $category)->exists()) {
+            return;
+        }
+
+        if (! in_array($category, PreventiveCategory::values(), true) && $category !== 'CONVEYOR') {
             return;
         }
 
@@ -199,26 +276,65 @@ class PreventiveChecklistItemController extends Controller
 
     private function selectedCategory(Request $request): string
     {
-        $category = (string) $request->query('category', 'PM1');
         $options = $this->categoryOptions();
+        if ($options === []) {
+            return '';
+        }
 
-        return array_key_exists($category, $options) ? $category : 'PM1';
+        $category = (string) $request->query('category', '');
+        if ($category !== '' && array_key_exists($category, $options)) {
+            return $category;
+        }
+
+        return (string) array_key_first($options);
     }
 
     /** @return array<string, string> */
     private function categoryOptions(): array
     {
-        $options = PreventiveCategory::labels();
-        $options['CONVEYOR'] = 'Preventive Conveyor';
+        PreventiveCategoryRecord::ensureBuiltin();
 
-        return $options;
+        return PreventiveCategoryRecord::query()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->pluck('label', 'code')
+            ->all();
+    }
+
+    private function labelExists(string $label, ?int $ignoreId = null): bool
+    {
+        return PreventiveCategoryRecord::query()
+            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
+            ->whereRaw('lower(label) = ?', [mb_strtolower($label)])
+            ->exists();
+    }
+
+    private function codeFromLabel(string $label): string
+    {
+        $code = strtoupper(Str::slug($label, '_'));
+        $code = trim(substr($code, 0, 30), '_');
+        if ($code === '') {
+            throw ValidationException::withMessages([
+                'label' => 'Nama kategori preventive tidak valid.',
+            ]);
+        }
+
+        $base = $code;
+        $suffix = 2;
+        while (PreventiveCategoryRecord::query()->where('code', $code)->exists()) {
+            $tail = '_'.$suffix;
+            $code = substr($base, 0, 30 - strlen($tail)).$tail;
+            $suffix++;
+        }
+
+        return $code;
     }
 
     /** @return array<string, string> */
     private function itemTypes(): array
     {
         return [
-            PreventivePm1Checklist::TYPE_CONDITION => 'Kondisi (Good / No Good)',
+            PreventivePm1Checklist::TYPE_CONDITION => 'Kondisi (Good / No Good / N/A)',
             PreventivePm1Checklist::TYPE_ACTION => 'Tindakan (Dilakukan / Belum)',
             PreventivePm1Checklist::TYPE_MEASUREMENT => 'Pengukuran (isian angka)',
         ];

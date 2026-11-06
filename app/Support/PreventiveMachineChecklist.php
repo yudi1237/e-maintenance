@@ -69,6 +69,22 @@ class PreventiveMachineChecklist
     }
 
     /**
+     * @return list<string>
+     */
+    public static function allItemKeys(?string $category): array
+    {
+        $keys = [];
+
+        foreach (self::groups($category) as $group) {
+            foreach (array_keys($group['items'] ?? []) as $key) {
+                $keys[] = (string) $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function filledOk(?string $category): array
@@ -120,7 +136,7 @@ class PreventiveMachineChecklist
     public static function allowedValues(?string $category): array
     {
         if (self::sheetClass($category) !== null) {
-            return [PreventiveChecklist::OK, PreventiveChecklist::NOT_OK];
+            return [PreventiveChecklist::OK, PreventiveChecklist::NOT_OK, PreventiveChecklist::NA];
         }
 
         return array_keys(PreventiveChecklist::valueLabels());

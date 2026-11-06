@@ -5,10 +5,14 @@
                 <div class="absolute top-0 right-0 w-96 h-96 bg-amber-400 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
                 <div class="absolute bottom-0 left-0 w-64 h-64 bg-orange-500 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4"></div>
             </div>
-            <div class="relative max-w-4xl mx-auto">
-                <a href="{{ route('preventive.menu') }}" class="inline-flex items-center gap-1 text-sm text-amber-200/90 hover:text-white">← Kembali ke menu preventive</a>
+            <div class="relative w-full">
+                @if ($editingReport ?? null)
+                    <a href="{{ route('home.submissions.conveyor', $editingReport) }}" class="inline-flex items-center gap-1 text-sm text-amber-200/90 hover:text-white">← Kembali ke detail</a>
+                @else
+                    <a href="{{ route('preventive.menu') }}" class="inline-flex items-center gap-1 text-sm text-amber-200/90 hover:text-white">← Kembali ke menu preventive</a>
+                @endif
                 <p class="mt-4 text-amber-300/90 text-sm font-medium tracking-wide uppercase">PT Dharma Poliplast</p>
-                <h1 class="mt-1 text-xl sm:text-3xl font-bold text-white leading-tight">Preventive Conveyor</h1>
+                <h1 class="mt-1 text-xl sm:text-3xl font-bold text-white leading-tight">{{ ($editingReport ?? null) ? 'Edit Preventive Conveyor' : 'Preventive Conveyor' }}</h1>
                 <p class="mt-2 text-slate-300 text-sm max-w-lg">Checklist perawatan berkala conveyor. Tanggal & PIC terisi otomatis.</p>
 
                 <div class="mt-6 em-chip-row">
@@ -24,7 +28,7 @@
             </div>
         </div>
 
-        <div class="em-page-body">
+        <div class="em-page-body" style="max-width:none;width:100%;">
             <x-alert-light />
 
             @if ($errors->any())
@@ -38,8 +42,19 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('preventive-conveyor.store') }}" class="space-y-5" enctype="multipart/form-data">
+            @php
+                $editingReport = $editingReport ?? null;
+                $savedItems = $editingReport?->items ?? [];
+                $savedRemarks = $editingReport?->item_remarks ?? [];
+                $savedTeamIds = collect($editingReport?->team_members ?? [])->pluck('id')->all();
+                $sparepartChoice = $editingReport ? (filled($editingReport->sparepart_items) ? 'sparepart' : 'none') : null;
+                $sparepartItems = $editingReport?->sparepart_items;
+            @endphp
+            <form method="POST" action="{{ $editingReport ? route('home.submissions.conveyor.update', $editingReport) : route('preventive-conveyor.store') }}" class="space-y-5" enctype="multipart/form-data" data-confirm-preview>
                 @csrf
+                @if ($editingReport)
+                    @method('PUT')
+                @endif
 
                 <div class="em-form-section">
                     <div class="em-section-header mb-5 pb-4 border-b border-slate-100 dark:border-white/10">
@@ -51,17 +66,27 @@
                     <div class="grid grid-cols-1 gap-5">
                         <div>
                             <label for="conveyor_name" class="em-label-light">Nama / No Conveyor *</label>
-                            <input id="conveyor_name" name="conveyor_name" type="text" class="em-input-light" value="{{ old('conveyor_name') }}" placeholder="Contoh: Conveyor Line 1" required maxlength="200">
+                            <input id="conveyor_name" name="conveyor_name" type="text" class="em-input-light" value="{{ old('conveyor_name', $editingReport?->conveyor_name) }}" placeholder="Contoh: Conveyor Line 1" required maxlength="200">
                             <x-input-error :messages="$errors->get('conveyor_name')" class="mt-2" />
                         </div>
+                    </div>
+                </div>
+
+                @include('preventive.partials.team-members')
+
+                <div class="em-form-section">
+                    <div class="em-section-header mb-5 pb-4 border-b border-slate-100 dark:border-white/10">
                         <div>
-                            <label for="work_shift" class="em-label-light">Shift Kerja *</label>
-                            <select id="work_shift" name="work_shift" class="em-input-light" required>
-                                @foreach ($shiftLabels as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('work_shift', $detectedShift) === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
+                            <h2 class="text-base font-semibold text-slate-800 dark:text-white">Shift Kerja</h2>
                         </div>
+                    </div>
+                    <div>
+                        <label for="work_shift" class="em-label-light">Shift Kerja *</label>
+                        <select id="work_shift" name="work_shift" class="em-input-light" required>
+                            @foreach ($shiftLabels as $value => $label)
+                                <option value="{{ $value }}" @selected(old('work_shift', $detectedShift) === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
 
@@ -72,14 +97,15 @@
                                 <h2 class="text-base font-semibold text-amber-900 dark:text-amber-200">{{ $group['label'] }}</h2>
                             </div>
                             <div class="overflow-x-auto">
-                                <table class="min-w-full text-sm">
+                                <table class="w-full text-sm" style="min-width:40rem;">
                                     <thead>
                                         <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-white/10 dark:bg-slate-900/40 dark:text-slate-400">
                                             <th class="px-3 py-2 w-12">No</th>
-                                            <th class="px-3 py-2 min-w-[14rem]">Item Pemeriksaan</th>
-                                            <th class="px-3 py-2 min-w-[16rem]">Standar/ Metode Cek</th>
-                                            <th class="px-3 py-2 text-center w-20">OK</th>
+                                            <th class="px-3 py-2">Item Pemeriksaan</th>
+                                            <th class="px-3 py-2">Standar/ Metode Cek</th>
+                                            <th class="px-3 py-2 text-center w-24">OK</th>
                                             <th class="px-3 py-2 text-center w-24">Not OK</th>
+                                            <th class="px-3 py-2" style="min-width:12rem;">Remarks</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100 dark:divide-white/5">
@@ -97,15 +123,28 @@
                                                                 name="items[{{ $key }}]"
                                                                 value="{{ $value }}"
                                                                 class="h-4 w-4 border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-slate-500 dark:bg-slate-900"
-                                                                @checked(old('items.'.$key) === $value)
+                                                                @checked(old('items.'.$key, $savedItems[$key] ?? null) === $value)
                                                             >
                                                         </label>
                                                     </td>
                                                 @endforeach
+                                                <td class="px-3 py-3" style="min-width:12rem;">
+                                                    <input
+                                                        type="text"
+                                                        name="remarks[{{ $key }}]"
+                                                        value="{{ old('remarks.'.$key, $savedRemarks[$key] ?? '') }}"
+                                                        maxlength="500"
+                                                        placeholder="Catatan"
+                                                        class="em-input-light py-1.5 text-sm"
+                                                    >
+                                                    @error('remarks.'.$key)
+                                                        <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                                                    @enderror
+                                                </td>
                                             </tr>
                                             @error('items.'.$key)
                                                 <tr>
-                                                    <td colspan="5" class="px-3 pb-3 pt-0">
+                                                    <td colspan="6" class="px-3 pb-3 pt-0">
                                                         <p class="text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
                                                     </td>
                                                 </tr>
@@ -118,22 +157,39 @@
                     @endforeach
                 </div>
 
+                <div class="em-form-section">
+                    <x-preventive.sparepart-usage :choice="$sparepartChoice" :items="$sparepartItems" />
+                </div>
+
                 <div class="em-form-section space-y-5">
+                    @if ($editingReport && $editingReport->evidence_urls !== [])
+                        <div>
+                            <p class="em-label-light">Evidence tersimpan</p>
+                            <ul class="space-y-1">
+                                @foreach ($editingReport->evidence_urls as $url)
+                                    <li><a href="{{ $url }}" target="_blank" class="text-sm text-amber-700 hover:underline dark:text-amber-300">Lihat foto →</a></li>
+                                @endforeach
+                            </ul>
+                            <p class="mt-1 text-xs text-slate-500">Foto baru ditambahkan ke evidence yang sudah ada.</p>
+                        </div>
+                    @endif
                     <x-preventive.evidence-upload />
                     <div>
                         <label for="notes" class="em-label-light">Catatan (opsional)</label>
-                        <textarea id="notes" name="notes" rows="4" class="em-input-light" placeholder="Temuan, sparepart, atau tindak lanjut...">{{ old('notes') }}</textarea>
+                        <textarea id="notes" name="notes" rows="4" class="em-input-light" placeholder="Temuan, sparepart, atau tindak lanjut...">{{ old('notes', $editingReport?->notes) }}</textarea>
                     </div>
                 </div>
 
                 <div class="flex flex-col gap-4 pt-2 sticky bottom-0 z-20 em-form-sticky backdrop-blur py-3 -mx-3 px-3 sm:static sm:z-auto sm:bg-transparent sm:p-0 sm:mx-0 border-t sm:border-0">
                     <button type="submit" class="em-btn-primary sm:min-w-[220px]">
-                        Simpan Preventive
+                        {{ $editingReport ? 'Simpan Perubahan' : 'Simpan Preventive' }}
                     </button>
                 </div>
             </form>
 
-            @if ($recentReports->isNotEmpty())
+            <x-submit-preview />
+
+            @if (! $editingReport && $recentReports->isNotEmpty())
                 <div class="mt-8 em-form-section">
                     <h2 class="text-base font-semibold text-slate-800 dark:text-white mb-4">Preventive terakhir Anda</h2>
                     <div class="space-y-3">

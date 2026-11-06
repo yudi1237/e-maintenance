@@ -169,11 +169,14 @@
                 {{ $filteredReportCount }} hasil ditampilkan dari {{ $reportCount }} preventive tercatat
             </p>
             </div>
-            <button type="button" class="em-btn-primary w-fit" @click="toggleForm()">Schedule Preventive</button>
+            @if (auth()->user()->seesFullDashboard())
+                <button type="button" class="em-btn-primary w-fit" @click="toggleForm()">Schedule Preventive</button>
+            @endif
         </div>
 
         <x-alert />
 
+        @if (auth()->user()->seesFullDashboard())
         <div class="em-glass rounded-2xl p-4 sm:p-6" x-show="showPicker" x-cloak>
             <div class="mb-4">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Pilih Kategori Preventive</h2>
@@ -447,6 +450,7 @@
                 <div class="p-4 border-t border-slate-200 dark:border-white/10">{{ $schedules->links() }}</div>
             @endif
         </div>
+        @endif
 
         <form method="GET" action="{{ route('admin.preventive.index') }}" class="em-glass rounded-2xl p-6">
             @if ($scheduleMonth)
@@ -521,7 +525,7 @@
                                 </td>
                                 <td class="px-4 py-3 text-right whitespace-nowrap">
                                     <div class="inline-flex items-center justify-end gap-3">
-                                        <a href="{{ route('admin.preventive.export', $report) }}" class="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-medium">Download</a>
+                                        <a href="{{ route('admin.preventive.export', $report) }}" class="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-medium">Download PDF</a>
                                         <a href="{{ route('admin.preventive.show', $report) }}" class="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-medium">Lihat →</a>
                                     </div>
                                 </td>

@@ -1,15 +1,22 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-white leading-tight">Tambah Teknisi</h2>
+        <h2 class="font-semibold text-xl text-gray-800 dark:text-white leading-tight">Teknisi</h2>
     </x-slot>
 
     <div class="py-8">
         <div class="em-shell space-y-6">
             <x-alert />
 
-            <p class="text-sm text-slate-500 dark:text-slate-400">PIC teknisi dipakai saat mengambil tiket OP di halaman Teknisi Maintenance. Setiap PIC punya PIN sendiri.</p>
-
-            <div class="em-card p-6">
+            @php
+                $showTechnicianForm = $errors->any() || filled(old('name')) || filled(old('npk'));
+            @endphp
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm text-slate-500 dark:text-slate-400">PIC teknisi dipakai saat mengambil tiket OP di halaman Teknisi Maintenance. Setiap PIC punya PIN sendiri.</p>
+                <button type="button" id="show-technician-form" class="em-btn-primary {{ $showTechnicianForm ? 'hidden' : '' }}" style="background:#0891b2;color:#fff;">
+                    Tambah Teknisi
+                </button>
+            </div>
+            <div id="technician-create-form" class="em-card p-6 {{ $showTechnicianForm ? '' : 'hidden' }}">
                 <h3 class="font-medium text-gray-800 dark:text-white mb-4">Tambah PIC Teknisi</h3>
                 <form method="POST" action="{{ route('admin.technicians.store') }}" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     @csrf
@@ -34,6 +41,15 @@
                     </div>
                 </form>
             </div>
+            <script>
+                document.getElementById('show-technician-form')?.addEventListener('click', () => {
+                    document.getElementById('technician-create-form')?.classList.remove('hidden');
+                    document.getElementById('show-technician-form')?.classList.add('hidden');
+                    document.getElementById('name')?.focus();
+                });
+            </script>
+
+            @include('admin.partials.technician-status')
 
             <div class="em-card overflow-hidden">
                 <div class="overflow-x-auto">

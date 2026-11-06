@@ -41,14 +41,4 @@ class PreventiveMtcChecklist extends PreventivePm1Checklist
         ];
     }
 
-    /**
-     * @return array<string, string>
-     */
-    public static function valueLabels(string $type): array
-    {
-        return [
-            PreventiveChecklist::OK => 'OK',
-            PreventiveChecklist::NOT_OK => 'Not OK',
-        ];
-    }
 }

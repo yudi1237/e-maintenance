@@ -68,6 +68,35 @@ class PreventiveEvidence
             ->all();
     }
 
+    /**
+     * Gambar evidence sebagai data URI agar bisa masuk ke PDF tanpa memuat file dari internet.
+     *
+     * @param  list<string>|null  $paths
+     * @return list<string>
+     */
+    public static function pdfDataUris(?array $paths): array
+    {
+        $uris = [];
+
+        foreach ($paths ?? [] as $path) {
+            if (! is_string($path) || $path === '') {
+                continue;
+            }
+
+            $absolute = Storage::disk('public')->path($path);
+            if (! is_file($absolute)) {
+                continue;
+            }
+
+            $uri = self::imageDataUri($absolute);
+            if ($uri !== null) {
+                $uris[] = $uri;
+            }
+        }
+
+        return $uris;
+    }
+
     /** @param  list<string>|null  $paths */
     public static function delete(?array $paths): void
     {
@@ -76,5 +105,48 @@ class PreventiveEvidence
                 Storage::disk('public')->delete($path);
             }
         }
+    }
+
+    private static function imageDataUri(string $absolute): ?string
+    {
+        $contents = file_get_contents($absolute);
+        if ($contents === false || $contents === '') {
+            return null;
+        }
+
+        $mime = mime_content_type($absolute) ?: '';
+        if (! function_exists('imagecreatefromstring')) {
+            return in_array($mime, ['image/jpeg', 'image/png', 'image/gif'], true)
+                ? 'data:'.$mime.';base64,'.base64_encode($contents)
+                : null;
+        }
+
+        $image = @imagecreatefromstring($contents);
+        if ($image === false) {
+            return in_array($mime, ['image/jpeg', 'image/png', 'image/gif'], true)
+                ? 'data:'.$mime.';base64,'.base64_encode($contents)
+                : null;
+        }
+
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $max = 480;
+        if ($width > $max || $height > $max) {
+            $scale = $max / max($width, $height);
+            $scaled = imagescale($image, max(1, (int) round($width * $scale)), max(1, (int) round($height * $scale)));
+            if ($scaled !== false) {
+                imagedestroy($image);
+                $image = $scaled;
+            }
+        }
+
+        ob_start();
+        imagejpeg($image, null, 75);
+        $jpeg = ob_get_clean();
+        imagedestroy($image);
+
+        return is_string($jpeg) && $jpeg !== ''
+            ? 'data:image/jpeg;base64,'.base64_encode($jpeg)
+            : null;
     }
 }

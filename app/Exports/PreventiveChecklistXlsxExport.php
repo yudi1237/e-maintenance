@@ -78,7 +78,7 @@ class PreventiveChecklistXlsxExport
     private function itemTypes(): array
     {
         return [
-            PreventivePm1Checklist::TYPE_CONDITION => 'Kondisi (Good / No Good)',
+            PreventivePm1Checklist::TYPE_CONDITION => 'Kondisi (Good / No Good / N/A)',
             PreventivePm1Checklist::TYPE_ACTION => 'Tindakan (Dilakukan / Belum)',
             PreventivePm1Checklist::TYPE_MEASUREMENT => 'Pengukuran (isian angka)',
         ];

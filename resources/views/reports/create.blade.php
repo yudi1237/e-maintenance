@@ -54,7 +54,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('reports.store') }}" id="report-form" class="space-y-5">
+            <form method="POST" action="{{ route('reports.store') }}" id="report-form" class="space-y-5" data-confirm-preview>
                 @csrf
                 <input type="hidden" name="report_date" value="{{ $currentDate }}">
 
@@ -117,7 +117,7 @@
                                         Mesin {{ $machine->machine_number }} — {{ $machine->view_label }}
                                     </option>
                                 @empty
-                                    <option value="" disabled>Belum ada data master mesin. Tambahkan dari menu Admin → Master Data Mesin.</option>
+                                    <option value="" disabled>Belum ada data master mesin. Tambahkan dari menu Asset → Data Mesin.</option>
                                 @endforelse
                             </select>
                             <p class="mt-2 text-xs text-slate-500">Field ini mengikuti tiket yang dipilih.</p>
@@ -229,6 +229,7 @@
         </div>
     </div>
 
+    <x-submit-preview />
     <x-data-terkirim-modal />
 
     @push('scripts')

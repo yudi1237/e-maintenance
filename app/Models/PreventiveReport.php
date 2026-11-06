@@ -27,20 +27,30 @@ class PreventiveReport extends Model
         'category',
         'work_date',
         'work_shift',
+        'team_members',
         'items',
         'readings',
+        'item_remarks',
         'notes',
+        'penggunaan_sparepart',
+        'sparepart_items',
         'evidence_paths',
         'result',
         'status',
+        'injection_approved_by',
+        'quality_approved_by',
+        'maintenance_approved_by',
     ];
 
     protected function casts(): array
     {
         return [
             'work_date' => 'date',
+            'team_members' => 'array',
             'items' => 'array',
             'readings' => 'array',
+            'item_remarks' => 'array',
+            'sparepart_items' => 'array',
             'evidence_paths' => 'array',
         ];
     }
@@ -48,6 +58,21 @@ class PreventiveReport extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function injectionApprover(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'injection_approved_by');
+    }
+
+    public function qualityApprover(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'quality_approved_by');
+    }
+
+    public function maintenanceApprover(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'maintenance_approved_by');
     }
 
     public function machineName(): BelongsTo
@@ -103,6 +128,16 @@ class PreventiveReport extends Model
     public function getWorkShiftLabelAttribute(): string
     {
         return WorkShift::labels()[$this->work_shift] ?? $this->work_shift;
+    }
+
+    public function getTeamMembersLabelAttribute(): string
+    {
+        $names = collect($this->team_members ?? [])
+            ->map(fn ($member) => is_array($member) ? ($member['name'] ?? '') : (string) $member)
+            ->filter()
+            ->values();
+
+        return $names->isEmpty() ? '—' : $names->implode(', ');
     }
 
     /**

@@ -14,7 +14,7 @@ class ReportExportController extends Controller
 {
     public function export(Request $request): StreamedResponse|RedirectResponse
     {
-        abort_unless($request->user()?->seesFullDashboard(), 403);
+        abort_unless($request->user()?->seesAdminDashboard(), 403);
 
         $validated = $request->validate([
             'start_date' => ['required', 'date'],

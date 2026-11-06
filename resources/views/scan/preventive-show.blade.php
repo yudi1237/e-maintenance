@@ -25,6 +25,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-8">
                 <div><span class="text-slate-500">Nama Mesin</span><p class="mt-0.5 text-slate-900 dark:text-white">{{ $report->machine_name_display }}</p></div>
                 <div><span class="text-slate-500">Kategori</span><p class="mt-0.5 text-slate-900 dark:text-white">{{ $report->category_label }}</p></div>
+                <div><span class="text-slate-500">Anggota Tim</span><p class="mt-0.5 text-slate-900 dark:text-white">{{ $report->team_members_label }}</p></div>
                 <div><span class="text-slate-500">Shift</span><p class="mt-0.5 text-slate-900 dark:text-white">{{ $report->work_shift_label }}</p></div>
                 <div><span class="text-slate-500">PIC</span><p class="mt-0.5 text-slate-900 dark:text-white">{{ $report->pic_name }}</p></div>
                 <div><span class="text-slate-500">Tanggal</span><p class="mt-0.5 text-slate-900 dark:text-white">{{ $report->work_date->format('d/m/Y') }}</p></div>
@@ -32,7 +33,7 @@
 
             <div class="border-t border-slate-200 pt-6 dark:border-white/10">
                 <h3 class="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-4">Checklist</h3>
-                <x-preventive-checklist-result :groups="$report->checklistGroups()" :items="$report->items ?? []" :readings="$report->readings ?? []" />
+                <x-preventive-checklist-result :groups="$report->checklistGroups()" :items="$report->items ?? []" :readings="$report->readings ?? []" :remarks="$report->item_remarks ?? []" />
             </div>
 
             <x-preventive.evidence-gallery :urls="$report->evidence_urls" />

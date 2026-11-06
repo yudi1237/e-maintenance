@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Technician;
 use App\Support\TablePagination;
+use App\Support\TechnicianDuty;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,6 +18,14 @@ class TechnicianController extends Controller
     {
         return view('admin.technicians.index', [
             'technicians' => Technician::query()->orderBy('name')->paginate(TablePagination::perPage()),
+            'technicianStatuses' => TechnicianDuty::snapshot(),
+        ]);
+    }
+
+    public function status(): JsonResponse
+    {
+        return response()->json([
+            'technicians' => TechnicianDuty::snapshot(),
         ]);
     }
 

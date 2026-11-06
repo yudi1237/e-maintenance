@@ -17,30 +17,26 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RobotController extends Controller
 {
-    public function index(Request $request): View
+    public function index(): View
     {
-        $category = $this->resolvedCategory($request);
-
         return view('admin.robots.index', [
-            'category' => $category,
-            'categories' => EquipmentCategory::labels(),
-            'formTitle' => EquipmentCategory::formTitle($category),
-            'items' => $this->items($category),
+            'types' => EquipmentCategory::typeOptions(),
+            'areas' => EquipmentCategory::areaOptions(),
+            'items' => $this->items(),
         ]);
     }
 
-    public function export(Request $request): StreamedResponse|RedirectResponse
+    public function export(): StreamedResponse|RedirectResponse
     {
-        $category = $this->resolvedCategory($request);
-        $items = $this->exportRows($category);
+        $items = $this->exportRows();
 
         if ($items->isEmpty()) {
             return redirect()
-                ->route('admin.robots.index', $this->indexQuery($category))
-                ->withErrors(['export' => 'Belum ada master data '.EquipmentCategory::label($category).' untuk diunduh.']);
+                ->route('admin.robots.index')
+                ->withErrors(['export' => 'Belum ada master data equipment untuk diunduh.']);
         }
 
-        $export = new EquipmentXlsxExport($category);
+        $export = new EquipmentXlsxExport;
         $filename = $export->filename();
 
         return response()->streamDownload(function () use ($export, $items) {
@@ -68,36 +64,35 @@ class RobotController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $category = $this->resolvedCategory($request);
-        $validated = $this->validatedPayload($request, $category);
+        $validated = $this->validatedPayload($request);
 
-        if (EquipmentCategory::isRobot($category)) {
-            Robot::query()->create([
-                'robot_number' => $validated['number'],
-                'robot_type' => $validated['type'],
-                'is_active' => true,
-            ]);
-        } else {
-            Equipment::query()->create([
-                'category' => $category,
-                'number' => $validated['number'],
-                'type' => $validated['type'],
-                'is_active' => true,
-            ]);
-        }
+        $equipment = Equipment::query()->create([
+            'category' => $validated['category'],
+            'number' => $validated['number'],
+            'type' => $validated['specification'],
+            'specification' => $validated['specification'],
+            'area' => $validated['area'],
+            'is_active' => true,
+        ]);
+
+        $this->syncRobot($equipment);
 
         return redirect()
-            ->route('admin.robots.index', $this->indexQuery($category))
-            ->with('success', EquipmentCategory::formTitle($category).' berhasil ditambahkan.');
+            ->route('admin.robots.index')
+            ->with('success', 'Master data equipment berhasil ditambahkan.');
     }
 
     public function update(Request $request, Robot $robot): RedirectResponse
     {
-        $validated = $this->validatedPayload($request, EquipmentCategory::ROBOT, $robot);
+        $validated = $request->validate([
+            'robot_number' => ['required', 'string', 'max:50', Rule::unique('robots', 'robot_number')->ignore($robot->id)],
+            'robot_type' => ['required', 'string', 'max:150'],
+            'is_active' => ['sometimes', 'boolean'],
+        ]);
 
         $robot->update([
-            'robot_number' => $validated['number'],
-            'robot_type' => $validated['type'],
+            'robot_number' => $validated['robot_number'],
+            'robot_type' => $validated['robot_type'],
             'is_active' => $request->boolean('is_active'),
         ]);
 
@@ -117,48 +112,45 @@ class RobotController extends Controller
 
     public function updateEquipment(Request $request, Equipment $equipment): RedirectResponse
     {
-        $validated = $this->validatedPayload($request, $equipment->category, null, $equipment);
+        $previousCategory = $equipment->category;
+        $previousNumber = $equipment->number;
+        $validated = $this->validatedPayload($request, $equipment);
 
         $equipment->update([
+            'category' => $validated['category'],
             'number' => $validated['number'],
-            'type' => $validated['type'],
+            'type' => $validated['specification'],
+            'specification' => $validated['specification'],
+            'area' => $validated['area'],
             'is_active' => $request->boolean('is_active'),
         ]);
 
+        $this->syncRobot($equipment->fresh(), $previousCategory, $previousNumber);
+
         return redirect()
-            ->route('admin.robots.index', ['category' => $equipment->category])
-            ->with('success', EquipmentCategory::formTitle($equipment->category).' berhasil diperbarui.');
+            ->route('admin.robots.index')
+            ->with('success', 'Master data equipment berhasil diperbarui.');
     }
 
     public function destroyEquipment(Equipment $equipment): RedirectResponse
     {
-        $category = $equipment->category;
+        $this->removeRobot($equipment->category, $equipment->number);
         $equipment->delete();
 
         return redirect()
-            ->route('admin.robots.index', ['category' => $category])
-            ->with('success', EquipmentCategory::formTitle($category).' berhasil dihapus.');
+            ->route('admin.robots.index')
+            ->with('success', 'Master data equipment berhasil dihapus.');
     }
 
     /**
-     * @return array{number: string, type: string}
+     * @return array{category: string, number: string, specification: string, area: string}
      */
-    private function validatedPayload(Request $request, string $category, ?Robot $robot = null, ?Equipment $equipment = null): array
+    private function validatedPayload(Request $request, ?Equipment $equipment = null): array
     {
-        $number = $request->input('number', $request->input('robot_number'));
-        $type = $request->input('type', $request->input('robot_type'));
-        $request->merge([
-            'number' => $number,
-            'type' => $type,
-        ]);
-
-        $uniqueNumber = EquipmentCategory::isRobot($category)
-            ? Rule::unique('robots', 'robot_number')
-            : Rule::unique('equipments', 'number')->where('category', $category);
-
-        if ($robot) {
-            $uniqueNumber->ignore($robot->id);
-        }
+        $uniqueNumber = Rule::unique('equipments', 'number')->where(
+            'category',
+            (string) $request->input('category')
+        );
 
         if ($equipment) {
             $uniqueNumber->ignore($equipment->id);
@@ -166,90 +158,87 @@ class RobotController extends Controller
 
         $validated = $request->validate([
             'number' => ['required', 'string', 'max:50', $uniqueNumber],
-            'type' => ['required', 'string', 'max:150'],
+            'category' => ['required', 'string', Rule::in(EquipmentCategory::typeValues())],
+            'specification' => ['required', 'string', 'max:200'],
+            'area' => ['required', 'string', Rule::in(EquipmentCategory::areaValues())],
             'is_active' => ['sometimes', 'boolean'],
         ], [
-            'number.required' => 'Nomor wajib diisi.',
-            'number.unique' => 'Nomor sudah terdaftar.',
-            'type.required' => 'Type wajib diisi.',
+            'number.required' => 'Nomor equipment wajib diisi.',
+            'number.unique' => 'Nomor equipment sudah terdaftar untuk tipe ini.',
+            'category.required' => 'Tipe equipment wajib dipilih.',
+            'category.in' => 'Tipe equipment tidak valid.',
+            'specification.required' => 'Spesifikasi wajib diisi.',
+            'area.required' => 'Area wajib dipilih.',
+            'area.in' => 'Area tidak valid.',
         ]);
 
         return [
+            'category' => $validated['category'],
             'number' => $validated['number'],
-            'type' => $validated['type'],
+            'specification' => $validated['specification'],
+            'area' => $validated['area'],
         ];
     }
 
-    private function resolvedCategory(Request $request): string
+    private function syncRobot(Equipment $equipment, ?string $previousCategory = null, ?string $previousNumber = null): void
     {
-        $category = (string) $request->input('category', EquipmentCategory::ROBOT);
-
-        return in_array($category, EquipmentCategory::values(), true)
-            ? $category
-            : EquipmentCategory::ROBOT;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function indexQuery(string $category): array
-    {
-        return EquipmentCategory::isRobot($category) ? [] : ['category' => $category];
-    }
-
-    /**
-     * @return Collection<int, object{number: string, type: string, is_active: bool}>
-     */
-    private function exportRows(string $category): Collection
-    {
-        if (EquipmentCategory::isRobot($category)) {
-            return Robot::query()
-                ->orderBy('robot_number')
-                ->get()
-                ->map(fn (Robot $robot) => (object) [
-                    'number' => $robot->robot_number,
-                    'type' => $robot->robot_type,
-                    'is_active' => (bool) $robot->is_active,
-                ]);
+        if ($previousCategory === EquipmentCategory::ROBOT && ($previousCategory !== $equipment->category || $previousNumber !== $equipment->number)) {
+            $this->removeRobot($previousCategory, (string) $previousNumber);
         }
 
+        if ($equipment->category !== EquipmentCategory::ROBOT) {
+            return;
+        }
+
+        Robot::query()->updateOrCreate(
+            ['robot_number' => $equipment->number],
+            [
+                'robot_type' => $equipment->specification ?: $equipment->type,
+                'is_active' => $equipment->is_active,
+            ],
+        );
+    }
+
+    private function removeRobot(?string $category, ?string $number): void
+    {
+        if ($category !== EquipmentCategory::ROBOT || $number === null || $number === '') {
+            return;
+        }
+
+        Robot::query()->where('robot_number', $number)->delete();
+    }
+
+    /**
+     * @return Collection<int, object>
+     */
+    private function exportRows(): Collection
+    {
         return Equipment::query()
-            ->forCategory($category)
             ->orderBy('number')
+            ->orderBy('category')
             ->get()
             ->map(fn (Equipment $item) => (object) [
                 'number' => $item->number,
-                'type' => $item->type,
+                'type_label' => $item->category_label,
+                'specification' => $item->specification ?: $item->type,
+                'area_label' => $item->area_label,
                 'is_active' => (bool) $item->is_active,
             ]);
     }
 
-    private function items(string $category)
+    private function items()
     {
-        if (EquipmentCategory::isRobot($category)) {
-            return Robot::query()
-                ->orderBy('robot_number')
-                ->paginate(TablePagination::perPage(), ['*'], 'items')
-                ->withQueryString()
-                ->through(fn (Robot $robot) => (object) [
-                    'id' => $robot->id,
-                    'number' => $robot->robot_number,
-                    'type' => $robot->robot_type,
-                    'is_active' => $robot->is_active,
-                    'update_url' => route('admin.robots.update', $robot),
-                    'destroy_url' => route('admin.robots.destroy', $robot),
-                ]);
-        }
-
         return Equipment::query()
-            ->forCategory($category)
             ->orderBy('number')
+            ->orderBy('category')
             ->paginate(TablePagination::perPage(), ['*'], 'items')
             ->withQueryString()
             ->through(fn (Equipment $item) => (object) [
                 'id' => $item->id,
                 'number' => $item->number,
-                'type' => $item->type,
+                'category' => $item->category,
+                'specification' => $item->specification ?: $item->type,
+                'area' => $item->area,
                 'is_active' => $item->is_active,
                 'update_url' => route('admin.robots.equipments.update', $item),
                 'destroy_url' => route('admin.robots.equipments.destroy', $item),

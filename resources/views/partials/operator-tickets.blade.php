@@ -1,6 +1,6 @@
 <div class="em-glass rounded-2xl overflow-hidden">
     <div class="px-5 py-4 sm:px-6 border-b border-slate-200 dark:border-white/10">
-        <h2 class="text-base font-semibold text-slate-900 dark:text-white">Tiket Input OP</h2>
+        <h2 class="text-base font-semibold text-slate-900 dark:text-white">OP Mesin</h2>
     </div>
     <div class="w-full overflow-x-auto">
         <table class="w-full table-fixed text-sm">
@@ -18,7 +18,7 @@
                 <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
                     <th class="px-3 py-3 sm:px-4">Tiket</th>
                     <th class="px-3 py-3 sm:px-4">Mesin</th>
-                    <th class="px-3 py-3 sm:px-4">Barang</th>
+                    <th class="px-3 py-3 sm:px-4">Part</th>
                     <th class="px-3 py-3 sm:px-4">Operator</th>
                     <th class="px-3 py-3 sm:px-4">Stop</th>
                     <th class="px-3 py-3 sm:px-4">Masalah</th>
@@ -42,7 +42,9 @@
                         </td>
                         <td class="px-3 py-3.5 text-slate-600 sm:px-4 dark:text-slate-300">
                             <span class="block break-words">{{ $ticket->operator_name }}</span>
-                            <span class="mt-0.5 block text-xs text-slate-500">NPK {{ $ticket->npk }}</span>
+                            @if (filled($ticket->npk))
+                                <span class="mt-0.5 block text-xs text-slate-500">NPK {{ $ticket->npk }}</span>
+                            @endif
                         </td>
                         <td class="px-3 py-3.5 text-slate-600 sm:px-4 dark:text-slate-300">
                             <span class="block">{{ $ticket->stop_date?->format('d/m/Y') }}</span>

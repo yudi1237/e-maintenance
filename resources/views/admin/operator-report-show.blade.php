@@ -27,11 +27,11 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-8">
-                <div><span class="text-slate-500">Nama Barang</span><p class="mt-0.5 text-slate-900 dark:text-white">{{ $ticket->item_name }}</p></div>
+                <div><span class="text-slate-500">Nama Part</span><p class="mt-0.5 text-slate-900 dark:text-white">{{ $ticket->item_name }}</p></div>
                 <div><span class="text-slate-500">Nama Mesin</span><p class="mt-0.5 text-slate-900 dark:text-white">{{ $ticket->machine_name_display }}</p></div>
                 <div>
                     <span class="text-slate-500">Operator</span>
-                    <p class="mt-0.5 text-slate-900 dark:text-white">{{ $ticket->operator_name }} <span class="text-slate-500">· NPK {{ $ticket->npk }}</span></p>
+                    <p class="mt-0.5 text-slate-900 dark:text-white">{{ $ticket->operator_name }}@if (filled($ticket->npk)) <span class="text-slate-500">· NPK {{ $ticket->npk }}</span>@endif</p>
                 </div>
                 <div>
                     <span class="text-slate-500">PIC Teknisi</span>

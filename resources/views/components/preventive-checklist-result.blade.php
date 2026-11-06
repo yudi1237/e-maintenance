@@ -1,9 +1,9 @@
-@props(['groups', 'items', 'readings' => []])
+@props(['groups', 'items', 'readings' => [], 'remarks' => []])
 
 <div class="space-y-5">
     @foreach ($groups as $group)
         @if (($group['layout'] ?? '') === 'voltage')
-            <x-preventive-voltage-readings :group="$group" :readings="$readings" />
+            <x-preventive-voltage-readings :group="$group" :readings="$readings" :remarks="$remarks" />
             @continue
         @endif
         @php $groupHasInput = (bool) ($group['has_input'] ?? false); @endphp
@@ -22,6 +22,7 @@
                                 <th class="px-3 py-2 min-w-[8rem]">Isi Manual</th>
                             @endif
                             <th class="px-3 py-2 text-right">Hasil</th>
+                            <th class="px-3 py-2" style="min-width:12rem;">Remarks</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-white/5">
@@ -31,6 +32,7 @@
                                 $valueLabel = $group['answers'][$value] ?? '-';
                                 $hasInput = ! empty($item['input']);
                                 $reading = $readings[$key] ?? null;
+                                $remark = $remarks[$key] ?? null;
                             @endphp
                             <tr @class(['bg-yellow-100 dark:bg-yellow-500/15' => $hasInput])>
                                 <td class="px-3 py-3 text-slate-500 tabular-nums">{{ $loop->iteration }}</td>
@@ -56,6 +58,7 @@
                                         'bg-slate-100 text-slate-700' => $value === 'na' || $value === null,
                                     ])>{{ $valueLabel }}</span>
                                 </td>
+                                <td class="px-3 py-3 text-slate-700 dark:text-slate-200">{{ filled($remark) ? $remark : '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

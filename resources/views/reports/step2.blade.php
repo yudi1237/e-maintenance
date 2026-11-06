@@ -28,8 +28,8 @@
                     </div>
                     <div>
                         <p class="text-cyan-300/90 text-sm font-medium tracking-wide uppercase">PT Dharma Poliplast</p>
-                        <h1 class="mt-1 text-xl sm:text-3xl font-bold text-white leading-tight">Form Analisa & Tindakan Perbaikan</h1>
-                        <p class="mt-2 text-slate-300 text-sm max-w-lg">Lengkapi masalah, analisa akar penyebab, tindakan perbaikan, dan status.</p>
+                        <h1 class="mt-1 text-xl sm:text-3xl font-bold text-white leading-tight">{{ ($editing ?? false) ? 'Edit Pengisian OP' : 'Form Analisa & Tindakan Perbaikan' }}</h1>
+                        <p class="mt-2 text-slate-300 text-sm max-w-lg">{{ ($editing ?? false) ? 'Perbarui masalah, analisa, tindakan, sparepart, dan evidence. Status tiket tidak berubah.' : 'Lengkapi masalah, analisa akar penyebab, tindakan perbaikan, dan status.' }}</p>
                     </div>
                 </div>
 
@@ -71,8 +71,23 @@
             <x-flash-popup />
             <x-alert-light omit-success :omit-error-keys="['pin']" />
 
-            <form method="POST" action="{{ route('reports.step2.store', $report) }}" enctype="multipart/form-data" class="space-y-5" id="step2-form">
+            @php
+                $editing = $editing ?? false;
+                $savedWorkers = $editing && is_array($report->yang_mengerjakan) ? $report->yang_mengerjakan : [];
+                $workerModeDefault = $editing ? ($savedWorkers['mode'] ?? null) : null;
+                $savedTechnicianIds = $editing ? ($savedWorkers['technician_ids'] ?? []) : [];
+                $sparepartChoiceDefault = $editing
+                    ? (filled($report->sparepart_items) ? 'sparepart' : 'none')
+                    : null;
+                $sparepartItemsDefault = $editing && filled($report->sparepart_items)
+                    ? $report->sparepart_items
+                    : [['name' => '', 'qty' => '']];
+            @endphp
+            <form method="POST" action="{{ $editing ? route('home.submissions.op.update', $report) : route('reports.step2.store', $report) }}" enctype="multipart/form-data" class="space-y-5" id="step2-form" data-confirm-preview>
                 @csrf
+                @if ($editing)
+                    @method('PUT')
+                @endif
 
                 {{-- Masalah & Analisa --}}
                 <div class="em-form-section">
@@ -88,11 +103,11 @@
                     <div class="space-y-5">
                         <div>
                             <label for="masalah" class="em-label-light">1. Masalah *</label>
-                            <textarea id="masalah" name="masalah" rows="4" class="em-input-light" placeholder="Jelaskan masalah yang terjadi secara detail..." required>{{ old('masalah', $report->operatorReport?->problem) }}</textarea>
+                            <textarea id="masalah" name="masalah" rows="4" class="em-input-light" placeholder="Jelaskan masalah yang terjadi secara detail..." required>{{ old('masalah', $editing ? $report->masalah : $report->operatorReport?->problem) }}</textarea>
                         </div>
                         <div>
                             <label for="analisa_penyebab_kerusakan" class="em-label-light">2. Analisa Penyebab Kerusakan *</label>
-                            <textarea id="analisa_penyebab_kerusakan" name="analisa_penyebab_kerusakan" rows="4" class="em-input-light" placeholder="Analisa akar penyebab (root cause)..." required>{{ old('analisa_penyebab_kerusakan') }}</textarea>
+                            <textarea id="analisa_penyebab_kerusakan" name="analisa_penyebab_kerusakan" rows="4" class="em-input-light" placeholder="Analisa akar penyebab (root cause)..." required>{{ old('analisa_penyebab_kerusakan', $editing ? $report->analisa_penyebab_kerusakan : null) }}</textarea>
                         </div>
                     </div>
                 </div>
@@ -110,7 +125,7 @@
                     </div>
                     <div>
                         <label for="tindakan_perbaikan" class="em-label-light">3. Tindakan Perbaikan *</label>
-                        <textarea id="tindakan_perbaikan" name="tindakan_perbaikan" rows="5" class="em-input-light" placeholder="Jelaskan tindakan perbaikan yang dilakukan..." required>{{ old('tindakan_perbaikan') }}</textarea>
+                        <textarea id="tindakan_perbaikan" name="tindakan_perbaikan" rows="5" class="em-input-light" placeholder="Jelaskan tindakan perbaikan yang dilakukan..." required>{{ old('tindakan_perbaikan', $editing ? $report->tindakan_perbaikan : null) }}</textarea>
                     </div>
                 </div>
 
@@ -142,19 +157,19 @@
                             <label for="penggunaan_sparepart_choice" class="em-label-light">5. Penggunaan Sparepart *</label>
                             <select id="penggunaan_sparepart_choice" name="penggunaan_sparepart_choice" class="em-input-light" required>
                                 <option value="">— Pilih —</option>
-                                <option value="sparepart" @selected(old('penggunaan_sparepart_choice') === 'sparepart')>Sparepart</option>
-                                <option value="none" @selected(old('penggunaan_sparepart_choice') === 'none')>Tidak ada</option>
+                                <option value="sparepart" @selected(old('penggunaan_sparepart_choice', $sparepartChoiceDefault) === 'sparepart')>Sparepart</option>
+                                <option value="none" @selected(old('penggunaan_sparepart_choice', $sparepartChoiceDefault) === 'none')>Tidak ada</option>
                             </select>
                             <x-input-error :messages="$errors->get('penggunaan_sparepart_choice')" class="mt-2" />
                             <x-input-error :messages="$errors->get('sparepart_items')" class="mt-2" />
 
                             @php
-                                $oldItems = old('sparepart_items', [['name' => '', 'qty' => '']]);
+                                $oldItems = old('sparepart_items', $sparepartItemsDefault);
                                 if (! is_array($oldItems) || count($oldItems) === 0) {
                                     $oldItems = [['name' => '', 'qty' => '']];
                                 }
                             @endphp
-                            <div id="sparepart-items-wrap" class="mt-4 space-y-3 {{ old('penggunaan_sparepart_choice') === 'sparepart' ? '' : 'hidden' }}">
+                            <div id="sparepart-items-wrap" class="mt-4 space-y-3 {{ old('penggunaan_sparepart_choice', $sparepartChoiceDefault) === 'sparepart' ? '' : 'hidden' }}">
                                 <div class="flex items-center justify-between gap-3">
                                     <p class="text-xs text-slate-500">Isi nama sparepart dan qty. Minimal satu baris.</p>
                                     <button type="button" id="sparepart-add-row" class="em-btn-secondary !min-h-0 !px-3 !py-1.5 text-xs">+ Tambah baris</button>
@@ -181,6 +196,44 @@
                     </div>
                 </div>
 
+                {{-- Yang Mengerjakan --}}
+                <div class="em-form-section">
+                    <div class="em-section-header mb-5 pb-4 border-b border-slate-100 dark:border-white/10">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-semibold text-slate-800 dark:text-white">Yang Mengerjakan</h2>
+                            <p class="text-xs text-slate-500">Wajib dipilih. Teknisi tim bisa lebih dari satu PIC.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="worker_mode" class="em-label-light">6. Yang Mengerjakan *</label>
+                        <select id="worker_mode" name="worker_mode" class="em-input-light" required>
+                            <option value="">— Pilih —</option>
+                            <option value="team" @selected(old('worker_mode', $workerModeDefault) === 'team')>Teknisi Tim</option>
+                            <option value="self" @selected(old('worker_mode', $workerModeDefault) === 'self')>Saya sendiri</option>
+                        </select>
+                        <x-input-error :messages="$errors->get('worker_mode')" class="mt-2" />
+                        <x-input-error :messages="$errors->get('technician_ids')" class="mt-2" />
+
+                        @php
+                            $selectedTechnicians = array_map('strval', (array) old('technician_ids', $savedTechnicianIds));
+                        @endphp
+                        <div id="worker-team-wrap" class="mt-4 space-y-2 {{ old('worker_mode', $workerModeDefault) === 'team' ? '' : 'hidden' }}">
+                            <p class="text-xs text-slate-500">Pilih PIC teknisi yang mengerjakan OP ini. Boleh lebih dari satu.</p>
+                            @forelse ($technicians as $technician)
+                                <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 dark:border-white/10 dark:text-slate-200">
+                                    <input type="checkbox" name="technician_ids[]" value="{{ $technician->id }}" class="rounded border-slate-300 text-cyan-600" @checked(in_array((string) $technician->id, $selectedTechnicians, true))>
+                                    <span>{{ $technician->optionLabel() }}</span>
+                                </label>
+                            @empty
+                                <p class="text-sm text-amber-700">Belum ada PIC teknisi aktif.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+
                 {{-- Status Perbaikan --}}
                 <div class="em-form-section">
                     <div class="em-section-header mb-5 pb-4 border-b border-slate-100 dark:border-white/10">
@@ -193,9 +246,16 @@
                         </div>
                     </div>
                     <div class="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-800 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-200">
-                        Status akan diubah menjadi <strong>Close by teknisi</strong> setelah Form 2 tersimpan.
+                        @if ($editing)
+                            Status tiket tetap <strong>Close by teknisi</strong>. Hanya isi pengisian yang berubah.
+                        @else
+                            Status akan diubah menjadi <strong>Close by teknisi</strong> setelah Form 2 tersimpan.
+                        @endif
                     </div>
-                    <div class="mt-4">
+                    @if ($editing && $report->evidence_url)
+                        <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">Evidence tersimpan: <a href="{{ $report->evidence_url }}" target="_blank" class="text-cyan-600 hover:underline dark:text-cyan-400">lihat file</a>. Upload baru menggantikan file ini.</p>
+                    @endif
+                    <div class="mt-4 {{ $editing && ! $report->operatorReport?->claimed_technician_id ? 'hidden' : '' }}">
                         <label for="close-pin" class="em-label-light">PIN PIC {{ $report->operatorReport?->pic_name ?? $report->pic_name }} *</label>
                         <input
                             id="close-pin"
@@ -207,11 +267,11 @@
                             data-1p-ignore="true"
                             data-lpignore="true"
                             data-form-type="other"
-                            required
+                            @required(! $editing || $report->operatorReport?->claimed_technician_id)
                             class="em-input-light mt-1 w-full max-w-xs tracking-[0.35em]"
                             placeholder="••••"
                         >
-                        <p class="mt-1 text-xs text-slate-500">Masukkan PIN PIC yang mengambil tiket OP ini untuk Close ticket.</p>
+                        <p class="mt-1 text-xs text-slate-500">{{ $editing ? 'Masukkan PIN PIC yang mengambil tiket OP ini untuk menyimpan perubahan.' : 'Masukkan PIN PIC yang mengambil tiket OP ini untuk Close ticket.' }}</p>
                         <x-input-error :messages="$errors->get('pin')" class="mt-2" />
                     </div>
                 </div>
@@ -222,12 +282,14 @@
                     </p>
                     <button type="submit" class="em-btn-primary sm:min-w-[220px]">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        Simpan & Selesai
+                        {{ $editing ? 'Simpan Perubahan' : 'Simpan & Selesai' }}
                     </button>
                 </div>
             </form>
         </div>
     </div>
+
+    <x-submit-preview />
 
     @push('scripts')
     <script>
@@ -267,6 +329,24 @@
 
         sparepartChoice?.addEventListener('change', toggleSparepartFields);
         toggleSparepartFields();
+
+        const workerMode = document.getElementById('worker_mode');
+        const workerTeam = document.getElementById('worker-team-wrap');
+
+        function toggleWorkerTeam() {
+            const show = workerMode?.value === 'team';
+            workerTeam?.classList.toggle('hidden', !show);
+            if (!show) {
+                workerTeam?.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                    input.checked = false;
+                });
+            }
+        }
+
+        workerMode?.addEventListener('change', toggleWorkerTeam);
+        if (workerMode?.value !== 'team') {
+            workerTeam?.classList.add('hidden');
+        }
 
         sparepartAdd?.addEventListener('click', function () {
             const first = sparepartRows?.querySelector('.sparepart-row');

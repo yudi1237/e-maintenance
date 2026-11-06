@@ -55,6 +55,23 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-white/5">
+                        @foreach ($operatorTickets as $ticket)
+                            <tr class="hover:bg-slate-50 transition dark:hover:bg-white/5">
+                                <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ $ticket->stop_date?->format('d/m/Y') }}</td>
+                                <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ $ticket->machine_name_display }}</td>
+                                <td class="px-4 py-3 text-slate-600 max-w-[200px] whitespace-pre-wrap break-words dark:text-slate-300">{{ $ticket->problem }}</td>
+                                <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ $ticket->pic_name }}</td>
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium {{ $ticket->status_badge_class }}">
+                                        {{ $ticket->status_label }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="text-amber-600 text-xs dark:text-amber-400">Belum</span>
+                                </td>
+                                <td class="px-4 py-3 text-right text-slate-400">—</td>
+                            </tr>
+                        @endforeach
                         @forelse ($reports as $report)
                             <tr class="hover:bg-slate-50 transition dark:hover:bg-white/5">
                                 <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ $report->report_date->format('d/m/Y') }}</td>
@@ -78,9 +95,11 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr>
-                                <td colspan="7" class="px-4 py-12 text-center text-slate-500">Tidak ada laporan untuk periode yang dipilih.</td>
-                            </tr>
+                            @if ($operatorTickets->isEmpty())
+                                <tr>
+                                    <td colspan="7" class="px-4 py-12 text-center text-slate-500">Tidak ada laporan untuk periode yang dipilih.</td>
+                                </tr>
+                            @endif
                         @endforelse
                     </tbody>
                 </table>

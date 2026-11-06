@@ -55,6 +55,18 @@
                         <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Kategori Penyebab Kerusakan</h3>
                         <p class="text-slate-700 whitespace-pre-wrap dark:text-slate-200">{{ $report->damage_cause_category_label }}</p>
                     </div>
+                    @if ($report->line_stop_mesin_label !== '')
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Line Stop Mesin</h3>
+                            <p class="text-slate-700 dark:text-slate-200">{{ $report->line_stop_mesin_label }}</p>
+                        </div>
+                    @endif
+                    @if ($report->sub_damage_category_label !== '')
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Sub Kerusakan</h3>
+                            <p class="text-slate-700 dark:text-slate-200">{{ $report->sub_damage_category_label }}</p>
+                        </div>
+                    @endif
                     <div>
                         <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Tindakan Perbaikan</h3>
                         <p class="text-slate-700 whitespace-pre-wrap dark:text-slate-200">{{ $report->tindakan_perbaikan }}</p>
@@ -63,6 +75,12 @@
                         <div>
                             <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Penggunaan Sparepart</h3>
                             <p class="text-slate-700 whitespace-pre-wrap dark:text-slate-200">{{ $report->penggunaan_sparepart }}</p>
+                        </div>
+                    @endif
+                    @if ($report->workers_label !== '')
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Yang Mengerjakan</h3>
+                            <p class="text-slate-700 whitespace-pre-wrap dark:text-slate-200">{{ $report->workers_label }}</p>
                         </div>
                     @endif
                     @if ($report->evidence_url)

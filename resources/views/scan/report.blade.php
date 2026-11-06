@@ -55,6 +55,12 @@
                             <p class="text-slate-700 whitespace-pre-wrap dark:text-slate-200">{{ $report->penggunaan_sparepart }}</p>
                         </div>
                     @endif
+                    @if ($report->workers_label !== '')
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Yang Mengerjakan</h3>
+                            <p class="text-slate-700 whitespace-pre-wrap dark:text-slate-200">{{ $report->workers_label }}</p>
+                        </div>
+                    @endif
                     @if ($report->evidence_url)
                         <div>
                             <h3 class="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Evidence</h3>

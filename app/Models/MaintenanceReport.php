@@ -26,13 +26,19 @@ class MaintenanceReport extends Model
         'masalah',
         'analisa_penyebab_kerusakan',
         'damage_cause_category',
+        'line_stop_mesin',
+        'sub_damage_category_id',
         'tindakan_perbaikan',
         'tindakan_perbaikan_2',
         'evidence_path',
         'penggunaan_sparepart',
         'sparepart_items',
+        'yang_mengerjakan',
         'ada_op',
         'status_perbaikan',
+        'injection_approved_by',
+        'quality_approved_by',
+        'maintenance_approved_by',
         'step2_completed_at',
         'operator_report_id',
     ];
@@ -45,6 +51,8 @@ class MaintenanceReport extends Model
             'repair_finished_at' => 'datetime',
             'ada_op' => 'boolean',
             'sparepart_items' => 'array',
+            'yang_mengerjakan' => 'array',
+            'line_stop_mesin' => 'boolean',
             'step2_completed_at' => 'datetime',
         ];
     }
@@ -52,6 +60,21 @@ class MaintenanceReport extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function injectionApprover(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'injection_approved_by');
+    }
+
+    public function qualityApprover(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'quality_approved_by');
+    }
+
+    public function maintenanceApprover(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'maintenance_approved_by');
     }
 
     public function machineName(): BelongsTo
@@ -62,6 +85,11 @@ class MaintenanceReport extends Model
     public function damageCategory(): BelongsTo
     {
         return $this->belongsTo(DamageCategory::class);
+    }
+
+    public function subDamageCategory(): BelongsTo
+    {
+        return $this->belongsTo(DamageCategory::class, 'sub_damage_category_id');
     }
 
     public function operatorReport(): BelongsTo
@@ -92,6 +120,48 @@ class MaintenanceReport extends Model
     public function isStep2Completed(): bool
     {
         return $this->step2_completed_at !== null;
+    }
+
+    public function getWorkersLabelAttribute(): string
+    {
+        $data = $this->yang_mengerjakan;
+        if (! is_array($data)) {
+            return '';
+        }
+
+        $names = array_values(array_filter(array_map(
+            fn ($name) => trim((string) $name),
+            $data['names'] ?? []
+        )));
+
+        if (($data['mode'] ?? '') === 'self') {
+            return $names === [] ? 'Saya sendiri' : 'Saya sendiri ('.$names[0].')';
+        }
+
+        return implode(', ', $names);
+    }
+
+    public function getDashboardTechnicianLabelAttribute(): string
+    {
+        $data = $this->yang_mengerjakan;
+        if (! is_array($data)) {
+            return '';
+        }
+
+        $names = array_values(array_filter(array_map(
+            fn ($name) => trim((string) $name),
+            $data['names'] ?? []
+        )));
+
+        if (($data['mode'] ?? '') === 'self') {
+            return $names[0] ?? '';
+        }
+
+        if (($data['mode'] ?? '') === 'team') {
+            return implode(', ', $names);
+        }
+
+        return '';
     }
 
     /**
@@ -189,6 +259,22 @@ class MaintenanceReport extends Model
     public function getDamageCauseCategoryLabelAttribute(): string
     {
         return DamageCauseCategory::label($this->damage_cause_category);
+    }
+
+    public function getLineStopMesinLabelAttribute(): string
+    {
+        if ($this->line_stop_mesin === null) {
+            return '';
+        }
+
+        return $this->line_stop_mesin ? 'Yes' : 'No';
+    }
+
+    public function getSubDamageCategoryLabelAttribute(): string
+    {
+        $this->loadMissing('subDamageCategory');
+
+        return $this->subDamageCategory?->displayLabel() ?? '';
     }
 
     public function getWorkShiftLabelAttribute(): string

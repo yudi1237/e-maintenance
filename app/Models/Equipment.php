@@ -14,6 +14,8 @@ class Equipment extends Model
         'category',
         'number',
         'type',
+        'specification',
+        'area',
         'is_active',
     ];
 
@@ -41,6 +43,11 @@ class Equipment extends Model
 
     public function getCategoryLabelAttribute(): string
     {
-        return EquipmentCategory::label($this->category);
+        return EquipmentCategory::typeLabel($this->category);
+    }
+
+    public function getAreaLabelAttribute(): string
+    {
+        return EquipmentCategory::areaLabel($this->area);
     }
 }

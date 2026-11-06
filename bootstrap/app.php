@@ -21,9 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => route('login'));
 
         $middleware->redirectUsersTo(function (Request $request) {
-            return $request->user()?->canAccessAdmin()
-                ? route('admin.dashboard')
-                : route('home');
+            $user = $request->user();
+
+            return $user ? route($user->homeRouteName()) : route('login');
         });
 
         $middleware->web(append: [

@@ -32,8 +32,21 @@ class MaintenanceReportController extends Controller
             'tindakan_perbaikan' => $validated['tindakan_perbaikan'] ?? $report->tindakan_perbaikan,
         ];
 
+        $approverColumn = RepairStatus::approvalActorColumn($validated['status_perbaikan']);
+        if ($approverColumn !== null) {
+            $payload[$approverColumn] = $request->user()->id;
+        }
+
         if (array_key_exists('damage_cause_category', $validated) && filled($validated['damage_cause_category'])) {
             $payload['damage_cause_category'] = $validated['damage_cause_category'];
+        }
+
+        if (array_key_exists('line_stop_mesin', $validated) && $validated['line_stop_mesin'] !== null) {
+            $payload['line_stop_mesin'] = $validated['line_stop_mesin'] === 'yes';
+        }
+
+        if (filled($validated['sub_damage_category_id'] ?? null)) {
+            $payload['sub_damage_category_id'] = (int) $validated['sub_damage_category_id'];
         }
 
         $report->update($payload);

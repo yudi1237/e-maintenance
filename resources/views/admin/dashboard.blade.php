@@ -1,26 +1,33 @@
 <x-app-layout>
+    @if (auth()->user()->isOperator() && session('op_created'))
+        @include('admin.partials.op-created-popup')
+    @endif
     <div class="pb-16">
         {{-- Hero --}}
-        <div id="dashboard-kiosk" class="border-b border-slate-200 bg-white/80 dark:border-white/5 dark:bg-slate-900/50">
+        <div id="dashboard-kiosk" class="border-b border-slate-200 bg-white/80 dark:border-white/5 dark:bg-slate-900/50 {{ auth()->user()->isOperator() ? 'operator-kiosk' : '' }}">
             <div id="dashboard-kiosk-inner" class="em-shell flex flex-col py-8 sm:py-10">
                 <div id="dashboard-hero" class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
                     <div>
+                        @unless (auth()->user()->isOperator())
                         <div class="dashboard-live-badge inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-700 dark:text-cyan-300 mb-4">
                             <span class="em-pulse-live relative pl-3">Live</span>
                             <span class="text-cyan-600 dark:text-cyan-400/80">Update setiap 5 detik</span>
                         </div>
+                        @endunless
                         <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-                            {{ auth()->user()->isManagement() ? 'Dashboard Management' : 'Dashboard Mesin Injection' }}
+                            {{ auth()->user()->isOperator() ? 'Mesin Injection' : (auth()->user()->isPpic() ? 'Dashboard PPIC' : (auth()->user()->isManagement() ? 'Dashboard Management' : 'Dashboard Mesin Injection')) }}
                         </h1>
                         <p class="mt-2 text-slate-500 dark:text-slate-400 max-w-xl">
-                            {{ auth()->user()->isManagement() ? 'Monitoring kartu mesin, status OP, dan grafik performa PT Dharma Poliplast' : 'PT Dharma Poliplast' }}
+                            {{ auth()->user()->isOperator() ? 'Klik kartu mesin untuk membuka Input OP.' : ((auth()->user()->isManagement() || auth()->user()->isPpic()) ? 'Monitoring kartu mesin, status OP, dan grafik performa PT Dharma Poliplast' : 'PT Dharma Poliplast') }}
                         </p>
                     </div>
                     <div class="flex flex-col items-start gap-3 lg:items-end">
+                        @unless (auth()->user()->isOperator())
                         <div id="last-updated" class="text-sm text-slate-500 lg:text-right">
                             Memuat data...
                         </div>
-                        @if (auth()->user()->seesDashboardOverview())
+                        @endunless
+                        @if (auth()->user()->seesDashboardOverview() || auth()->user()->isOperator())
                             <button
                                 type="button"
                                 id="dashboard-fullscreen-btn"
@@ -34,17 +41,23 @@
                     </div>
                 </div>
 
-                @if (auth()->user()->seesDashboardOverview())
+                @if (auth()->user()->seesMachineMap())
                 <div id="dashboard-map" class="mt-8">
-                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-                        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Peta {{ $machineTotal }} Mesin Injection</h2>
+                    <div class="dashboard-map-toolbar flex flex-wrap items-center justify-between gap-4 mb-4">
+                        @unless (auth()->user()->isOperator())
                         <div class="flex flex-wrap items-center gap-3">
-                            <div class="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
-                                <span class="flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-slate-600 border border-slate-500"></span> Normal</span>
-                                <span class="flex items-center gap-2"><span class="em-machine-alert-dot h-3 w-3 rounded-full"></span> Ada OP</span>
-                                <span class="flex items-center gap-2"><span class="em-machine-pending-dot h-3 w-3 rounded-full"></span> Belum Close Approval / Log Temuan</span>
-                            </div>
-                            @if ($machineTotal > 0 && auth()->user()->seesFullDashboard())
+                            <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Peta {{ $machineTotal }} Mesin Injection</h2>
+                            @if ($machineTotal > 0)
+                                <div class="em-map-switch" role="group" aria-label="Tampilan peta mesin">
+                                    <button type="button" data-map-view="cards" class="is-on">Kartu Mesin</button>
+                                    <button type="button" data-map-view="layout">Layout Mesin</button>
+                                </div>
+                            @endif
+                        </div>
+                        @endunless
+                        <div class="flex flex-wrap items-center gap-3">
+                            @include('admin.partials.machine-color-legend')
+                            @if ($machineTotal > 0 && auth()->user()->seesAdminDashboard())
                                 <a href="{{ route('admin.machines.qr.download-all') }}" class="em-qr-btn dashboard-fs-hide">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
                                     Download semua QR
@@ -53,6 +66,14 @@
                         </div>
                     </div>
 
+                    @if (auth()->user()->canToggleMachineRunning())
+                        <p class="mb-3 text-sm text-slate-600 dark:text-slate-300">Klik lingkaran untuk memilih Hijau (Running), Merah (Breakdown), atau Standby. Klik pilihan yang sama lagi untuk menghapus tanda. Klik dua kali kartu untuk membuka halaman mesin.</p>
+                        <div id="machine-status-menu" class="machine-status-menu hidden" role="menu">
+                            <button type="button" data-status="running" role="menuitem"><span class="machine-status-swatch is-running"></span>Hijau (Running)</button>
+                            <button type="button" data-status="breakdown" role="menuitem"><span class="machine-status-swatch is-breakdown"></span>Merah (Breakdown)</button>
+                            <button type="button" data-status="standby" role="menuitem"><span class="machine-status-swatch is-standby"></span>Standby</button>
+                        </div>
+                    @endif
                     <div id="machine-grid" class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 sm:gap-3">
                         @forelse ($machines as $machine)
                             @php
@@ -66,18 +87,56 @@
                                 $alertClass = match ($alert) {
                                     'active' => 'em-machine-card--active',
                                     'pending' => 'em-machine-card--pending',
+                                    'approval' => 'em-machine-card--approval',
                                     default => 'em-machine-card--idle',
+                                };
+                                $isRunning = in_array($number, $runningMachines ?? [], true);
+                                $isBreakdown = in_array($number, $breakdownMachines ?? [], true);
+                                $isStandby = in_array($number, $standbyMachines ?? [], true);
+                                $markStatus = $isBreakdown ? 'breakdown' : ($isRunning ? 'running' : ($isStandby ? 'standby' : ''));
+                                $markClass = match ($markStatus) {
+                                    'running' => 'is-running',
+                                    'breakdown' => 'is-breakdown',
+                                    'standby' => 'is-standby',
+                                    default => '',
+                                };
+                                $markTitle = match ($markStatus) {
+                                    'running' => 'Hijau (Running)',
+                                    'breakdown' => 'Merah (Breakdown)',
+                                    'standby' => 'Standby',
+                                    default => 'Pilih Hijau (Running), Merah (Breakdown), atau Standby',
                                 };
                             @endphp
                             <div
                                data-machine="{{ $number }}"
                                data-alert="{{ $alert }}"
-                               title="{{ $machine->view_label }}"
-                               class="machine-card em-machine-card relative {{ $alertClass }}">
-                                <a href="{{ route('admin.machines.show', $number) }}" class="flex flex-col items-center justify-center w-full">
+                               @if (auth()->user()->canToggleMachineRunning()) data-href="{{ route('admin.machines.show', $number) }}" @endif
+                               title="{{ trim($machine->view_label.($machine->mold ? ' · '.$machine->mold->name : '')) }}"
+                               class="machine-card em-machine-card relative {{ $alertClass }} {{ auth()->user()->canToggleMachineRunning() ? 'machine-running-toggle' : '' }}">
+                                @if (auth()->user()->canToggleMachineRunning())
+                                    <button
+                                        type="button"
+                                        class="machine-running-mark {{ $markClass }}"
+                                        data-machine="{{ $number }}"
+                                        data-status="{{ $markStatus }}"
+                                        title="{{ $markTitle }}"
+                                        aria-haspopup="menu"
+                                        aria-pressed="{{ $markStatus !== '' ? 'true' : 'false' }}"
+                                    ></button>
+                                @else
+                                    <span class="machine-running-mark {{ $markClass !== '' ? $markClass : 'hidden' }}" data-machine="{{ $number }}" data-status="{{ $markStatus }}" title="{{ $markStatus === '' ? 'Mesin standby' : $markTitle }}"></span>
+                                @endif
+                                @if (auth()->user()->canToggleMachineRunning())
+                                    <div class="flex flex-col items-center justify-center w-full">
+                                @else
+                                <a href="{{ auth()->user()->isOperator() ? \App\Support\MachineQrCode::inputOpUrl($number) : route('admin.machines.show', $number) }}" class="flex flex-col items-center justify-center w-full">
+                                @endif
                                     <span class="machine-card-kicker text-[10px] uppercase tracking-widest text-slate-500">Mesin</span>
                                     <span class="em-machine-num text-2xl font-bold text-slate-800 dark:text-slate-200 mt-0.5">{{ $number }}</span>
                                     <span class="machine-card-name mt-1 text-[10px] text-slate-500 dark:text-slate-400 max-w-full truncate">{{ $machine->view_label }}</span>
+                                    @if ($machine->mold)
+                                        <span class="machine-card-name machine-card-mold block max-w-full truncate text-[10px] font-semibold" title="{{ $machine->mold->optionLabel() }}">{{ $machine->mold->name }}</span>
+                                    @endif
                                     <span class="machine-card-meta mt-2 w-full space-y-0.5 text-left text-[9px] leading-tight text-slate-600 dark:text-slate-400">
                                         <span class="block truncate">OP : <span class="machine-op-count font-semibold text-slate-800 dark:text-slate-200">{{ $opCount }}</span></span>
                                         <span class="block truncate">Log Temuan : <span class="machine-finding-count font-semibold text-slate-800 dark:text-slate-200">{{ $findingCount }}</span></span>
@@ -91,8 +150,12 @@
                                             <span class="rounded px-1 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">{{ $category }}</span>
                                         @endforeach
                                     </span>
+                                @if (auth()->user()->canToggleMachineRunning())
+                                    </div>
+                                @else
                                 </a>
-                                @if (auth()->user()->seesFullDashboard())
+                                @endif
+                                @if (auth()->user()->seesAdminDashboard())
                                 <a href="{{ route('admin.machines.qr.download', $number) }}"
                                    title="Download QR Mesin {{ $number }}"
                                    class="dashboard-fs-hide absolute top-1.5 right-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/90 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-cyan-50 hover:text-cyan-700 dark:bg-slate-900/80 dark:text-slate-300 dark:ring-white/10 dark:hover:bg-cyan-500/20 dark:hover:text-cyan-200">
@@ -103,16 +166,95 @@
                         @empty
                             <div class="col-span-full em-glass rounded-2xl p-6 text-center text-sm text-slate-400">
                                 @if (auth()->user()->seesFullDashboard())
-                                    Belum ada master mesin. Tambahkan data di menu <span class="font-medium text-slate-800 dark:text-slate-200">Master Data Mesin</span>.
+                                    Belum ada master mesin. Tambahkan data di menu <span class="font-medium text-slate-800 dark:text-slate-200">Asset → Data Mesin</span>.
                                 @else
                                     Belum ada data mesin untuk ditampilkan.
                                 @endif
                             </div>
                         @endforelse
                     </div>
+                    @if ($machineTotal > 0)
+                        @php
+                            $machinesByNumber = $machines->keyBy(fn ($item) => (int) $item->machine_number);
+                            $layoutRows = [
+                                [
+                                    ['key' => 'cluster-1', 'tone' => 'shell', 'numbers' => range(1, 15)],
+                                    ['key' => 'cluster-2', 'tone' => 'muffler', 'numbers' => range(16, 29)],
+                                ],
+                                [
+                                    ['key' => 'cluster-3', 'tone' => 'body', 'numbers' => range(31, 43)],
+                                    ['gap' => true],
+                                    ['key' => 'cluster-4', 'tone' => 'garnish', 'numbers' => array_merge(range(44, 56), [30])],
+                                ],
+                            ];
+                            $extraClusters = [
+                                'k1aa' => ['key' => 'k1aa', 'tone' => 'body', 'numbers' => [60], 'compact' => true],
+                                'b65' => ['key' => 'b65', 'tone' => 'garnish', 'numbers' => [57], 'compact' => true],
+                                'piece-slide' => ['key' => 'piece-slide', 'tone' => 'garnish', 'numbers' => [58, 59], 'compact' => true],
+                            ];
+                        @endphp
+                        <div id="machine-layout">
+                            <div class="em-floor">
+                                @foreach ($layoutRows as $rowIndex => $clusters)
+                                    <div class="{{ $rowIndex === 0 ? 'em-floor-top' : 'em-floor-bottom' }}">
+                                        @foreach ($clusters as $cluster)
+                                            @if (! empty($cluster['gap']))
+                                                <div class="em-floor-gap" aria-hidden="true"></div>
+                                            @else
+                                                @include('admin.partials.machine-layout-cluster', [
+                                                    'cluster' => $cluster,
+                                                    'clusterNames' => $clusterNames,
+                                                    'machinesByNumber' => $machinesByNumber,
+                                                    'machineStats' => $machineStats,
+                                                    'runningMachines' => $runningMachines,
+                                                    'breakdownMachines' => $breakdownMachines ?? [],
+                                                    'standbyMachines' => $standbyMachines ?? [],
+                                                ])
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                @endforeach
+                                <div class="em-floor-extra">
+                                    <div class="em-floor-extra-group">
+                                        @include('admin.partials.machine-layout-cluster', [
+                                            'cluster' => $extraClusters['k1aa'],
+                                            'clusterNames' => $clusterNames,
+                                            'machinesByNumber' => $machinesByNumber,
+                                            'machineStats' => $machineStats,
+                                            'runningMachines' => $runningMachines,
+                                            'breakdownMachines' => $breakdownMachines ?? [],
+                                            'standbyMachines' => $standbyMachines ?? [],
+                                        ])
+                                    </div>
+                                    <div class="em-floor-gap" aria-hidden="true"></div>
+                                    <div class="em-floor-extra-group">
+                                        @include('admin.partials.machine-layout-cluster', [
+                                            'cluster' => $extraClusters['b65'],
+                                            'clusterNames' => $clusterNames,
+                                            'machinesByNumber' => $machinesByNumber,
+                                            'machineStats' => $machineStats,
+                                            'runningMachines' => $runningMachines,
+                                            'breakdownMachines' => $breakdownMachines ?? [],
+                                            'standbyMachines' => $standbyMachines ?? [],
+                                        ])
+                                        @include('admin.partials.machine-layout-cluster', [
+                                            'cluster' => $extraClusters['piece-slide'],
+                                            'clusterNames' => $clusterNames,
+                                            'machinesByNumber' => $machinesByNumber,
+                                            'machineStats' => $machineStats,
+                                            'runningMachines' => $runningMachines,
+                                            'breakdownMachines' => $breakdownMachines ?? [],
+                                            'standbyMachines' => $standbyMachines ?? [],
+                                        ])
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                 </div>
                 @endif
 
+                @unless (auth()->user()->isOperator())
                 {{-- Stats --}}
                 <div id="dashboard-stats" class="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div class="em-glass rounded-2xl p-5">
@@ -146,13 +288,32 @@
                             <p class="text-xs text-slate-500 mt-1">Status Approve ({{ $approvalRoleCaption }}) · hari ini</p>
                     </div>
                 </div>
+                @endunless
 
             @if (auth()->user()->seesDashboardOverview())
             {{-- Grafik --}}
             <div id="dashboard-charts" class="em-glass mt-8 rounded-2xl p-4">
-                <div class="grid grid-cols-1 gap-4 {{ auth()->user()->seesFullDashboard() ? 'lg:grid-cols-4' : 'lg:grid-cols-2' }} lg:gap-3 lg:divide-x lg:divide-slate-200 dark:lg:divide-white/10">
-                    @if (auth()->user()->seesFullDashboard())
-                    <div class="min-w-0 lg:pr-3">
+                <div class="overflow-x-auto">
+                <div class="em-chart-grid {{ auth()->user()->seesTechnicianCharts() ? 'em-chart-grid--full' : 'em-chart-grid--compact' }}">
+                    @php
+                        $technicianChartCounts = ['idle' => 0, 'busy' => 0, 'off' => 0, 'overtime' => 0];
+                        foreach ($technicianStatuses as $technicianChartRow) {
+                            $technicianChartKey = $technicianChartRow['state'] ?? 'idle';
+                            if (! array_key_exists($technicianChartKey, $technicianChartCounts)) {
+                                $technicianChartKey = 'idle';
+                            }
+                            $technicianChartCounts[$technicianChartKey]++;
+                        }
+                    @endphp
+                    <div class="em-chart-cell min-w-0">
+                        <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Technician Status</h2>
+                        <p class="mb-2 text-[11px] text-slate-500 dark:text-slate-400">Standby, On Job, Off-duty, Overtime</p>
+                        <div class="relative h-36" id="technician-status-chart-wrap">
+                            <canvas id="technician-status-chart"></canvas>
+                        </div>
+                    </div>
+                    @if (auth()->user()->seesTechnicianCharts())
+                    <div class="em-chart-cell min-w-0">
                         <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Performer Teknisi</h2>
                         <p id="performer-period" class="mb-2 text-[11px] text-slate-500 dark:text-slate-400">OP diambil · {{ $charts['period_label'] }}</p>
                         <p id="performer-empty" class="text-xs text-slate-500 {{ $charts['performer']['labels'] === [] ? '' : 'hidden' }}">Belum ada data.</p>
@@ -160,7 +321,7 @@
                             <canvas id="performer-chart"></canvas>
                         </div>
                     </div>
-                    <div class="min-w-0 lg:px-3">
+                    <div class="em-chart-cell min-w-0">
                         <h2 class="text-sm font-semibold text-slate-900 dark:text-white">MTTR Teknisi</h2>
                         <p id="sla-summary" class="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
                             MTTR per teknisi · tiket diambil → Close by teknisi · {{ $charts['period_label'] }}
@@ -174,7 +335,7 @@
                         </div>
                     </div>
                     @endif
-                    <div class="min-w-0 {{ auth()->user()->seesFullDashboard() ? 'lg:px-3' : 'lg:pr-3' }}">
+                    <div class="em-chart-cell min-w-0">
                         <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Grafik Line Stop</h2>
                         <p id="machine-period" class="mb-2 text-[11px] text-slate-500 dark:text-slate-400">MTTR per mesin · OP dibuat → Close by teknisi · {{ $charts['period_label'] }}</p>
                         <p id="machine-chart-empty" class="text-xs text-slate-500 {{ $charts['machines']['labels'] === [] ? '' : 'hidden' }}">Belum ada data.</p>
@@ -182,7 +343,14 @@
                             <canvas id="machine-chart"></canvas>
                         </div>
                     </div>
-                    <div class="min-w-0 lg:pl-3">
+                    <div class="em-chart-cell min-w-0">
+                        <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Grafik Mesin</h2>
+                        <p id="fleet-period" class="mb-2 text-[11px] text-slate-500 dark:text-slate-400">Total, Running, Standby, OP On Progress–Close by teknisi, Breakdown</p>
+                        <div class="relative h-40" id="fleet-chart-wrap">
+                            <canvas id="fleet-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="em-chart-cell min-w-0">
                         <div class="flex items-center justify-between gap-2">
                             <h2 class="text-sm font-semibold text-slate-900 dark:text-white">PM Status</h2>
                             <div class="flex items-center gap-1">
@@ -235,249 +403,112 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
                 </div>
-            </div>
+                </div>
             </div>
             @endif
             </div>
         </div>
 
+        @unless (auth()->user()->isOperator())
         <div id="dashboard-rest" class="em-shell -mt-4 space-y-8">
             <x-alert />
-
-            {{-- Semua Laporan --}}
-            <div class="em-glass rounded-2xl overflow-hidden">
-                <div class="px-4 py-4 sm:px-6 border-b border-slate-200 dark:border-white/10">
-                    <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Semua Laporan Masuk</h2>
-                            @if (auth()->user()->seesDashboardOverview())
-                                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                    {{ auth()->user()->seesFullDashboard() ? 'Filter daftar tiket di bawah, atau Export Laporan Excel sesuai periode dan mesin.' : 'Filter daftar tiket untuk memantau status mesin dan laporan.' }}
-                                </p>
-                            @endif
-                        </div>
-                        @if (auth()->user()->seesDashboardOverview())
-                            <form method="GET" action="{{ route('admin.dashboard') }}" class="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5 xl:w-auto xl:max-w-4xl">
-                                <div>
-                                    <label for="export_start_date" class="em-label">Periode Mulai</label>
-                                    <input id="export_start_date" name="start_date" type="date" class="em-input !mt-1 min-h-[40px] px-3 py-2 text-sm" value="{{ old('start_date', $exportStartDate) }}">
-                                </div>
-                                <div>
-                                    <label for="export_end_date" class="em-label">Periode Akhir</label>
-                                    <input id="export_end_date" name="end_date" type="date" class="em-input !mt-1 min-h-[40px] px-3 py-2 text-sm" value="{{ old('end_date', $exportEndDate) }}">
-                                </div>
-                                <div>
-                                    <label for="export_machine_number" class="em-label">Filter Mesin</label>
-                                    <select id="export_machine_number" name="machine_number" class="em-input !mt-1 min-h-[40px] px-3 py-2 text-sm">
-                                        <option value="">Semua Mesin</option>
-                                        @foreach ($machineNumbers as $num)
-                                            <option value="{{ $num }}" @selected((string) old('machine_number', $ticketMachineNumber) === (string) $num)>Mesin {{ $num }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="flex items-end">
-                                    <button type="submit" class="em-btn-secondary w-full min-h-[40px] justify-center px-3">Filter</button>
-                                </div>
-                                @if (auth()->user()->seesFullDashboard())
-                                <div class="flex items-end">
-                                    <button type="submit" formaction="{{ route('admin.reports.export') }}" class="em-qr-btn w-full min-h-[40px] justify-center px-3">
-                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                        Download Excel
-                                    </button>
-                                </div>
-                                @endif
-                            </form>
-                        @endif
-                    </div>
-                    @if (auth()->user()->seesFullDashboard() && $errors->has('export'))
-                        <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-                            {{ $errors->first('export') }}
-                        </div>
-                    @endif
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
-                                <th class="px-4 py-3">Stop</th>
-                                <th class="px-4 py-3">Tiket OP</th>
-                                <th class="px-4 py-3">Mesin</th>
-                                <th class="px-4 py-3">Nama Barang</th>
-                                <th class="px-4 py-3">Masalah</th>
-                                <th class="px-4 py-3">Operator</th>
-                                <th class="px-4 py-3">Teknisi</th>
-                                <th class="px-4 py-3">Form 2</th>
-                                <th class="px-4 py-3">Status</th>
-                                <th class="px-4 py-3">Approval</th>
-                                <th class="px-4 py-3 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-white/5">
-                            @forelse ($tickets as $ticket)
-                                @php
-                                    $report = $ticket->maintenanceReport;
-                                @endphp
-                                <tr class="hover:bg-slate-50 transition dark:hover:bg-white/5">
-                                    <td class="px-4 py-3 text-slate-700 whitespace-nowrap dark:text-slate-200">{{ $ticket->stop_date_time_label }}</td>
-                                    <td class="px-4 py-3 font-medium text-slate-800 whitespace-nowrap dark:text-slate-100">#{{ $ticket->id }}</td>
-                                    <td class="px-4 py-3 text-slate-700 whitespace-nowrap dark:text-slate-200">
-                                        #{{ $ticket->machine_number }}
-                                        <span class="block text-xs text-slate-500 max-w-[160px] truncate">{{ $ticket->machine_name_display }}</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-slate-600 max-w-[180px] truncate dark:text-slate-300" title="{{ $ticket->item_name }}">{{ $ticket->item_name }}</td>
-                                    <td class="px-4 py-3 text-slate-600 max-w-[220px] truncate dark:text-slate-300" title="{{ $ticket->problem }}">{{ $ticket->problem }}</td>
-                                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap dark:text-slate-300">
-                                        {{ $ticket->operator_name }}
-                                        <span class="block text-xs text-slate-500">NPK {{ $ticket->npk }}</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap dark:text-slate-300">
-                                        @if ($ticket->pic_name !== 'Belum diambil')
-                                            {{ $ticket->pic_name }}
-                                        @else
-                                            <span class="text-slate-400">Belum diambil</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        @if ($report?->isStep2Completed())
-                                            <span class="text-emerald-400 text-xs">✓ Lengkap</span>
-                                        @else
-                                            <span class="text-amber-400 text-xs">Belum</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        @if ($report)
-                                            <x-admin.report-status-form :report="$report" :status-labels="$statusLabels" compact />
-                                        @else
-                                            <span class="inline-flex items-center rounded-lg border px-2.5 py-1.5 text-xs font-semibold {{ $ticket->status_badge_class }}" style="color: {{ \App\Support\RepairStatus::legendColor($ticket->status ?? \App\Support\RepairStatus::OPEN) }};">
-                                                {{ $ticket->status_label }}
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <x-admin.approval-progress :status="$report->status_perbaikan ?? $ticket->status" :report="$report" compact />
-                                    </td>
-                                    <td class="px-4 py-3 text-right whitespace-nowrap">
-                                        <div class="inline-flex items-center justify-end gap-3">
-                                            <a href="{{ route('admin.operator-reports.show', $ticket) }}" class="text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 dark:hover:text-cyan-300 text-xs font-medium">Detail →</a>
-                                            @if (auth()->user()->isAdmin())
-                                                <form method="POST" action="{{ route('admin.operator-reports.destroy', $ticket) }}" class="inline" onsubmit="return confirm('Hapus tiket OP #{{ $ticket->id }} beserta laporan perbaikannya?')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="text-red-600 hover:text-red-500 text-xs font-medium">Delete</button>
-                                                </form>
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="11" class="px-4 py-12 text-center text-slate-500">Tidak ada tiket OP yang sedang berjalan.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                @if ($tickets->hasPages())
-                    <div class="p-4 border-t border-slate-200 dark:border-white/10">{{ $tickets->links() }}</div>
-                @endif
-            </div>
-
-            @if (auth()->user()->seesPreventiveResults())
-            {{-- Preventive Mesin --}}
-            <div class="em-glass rounded-2xl overflow-hidden">
-                <div class="px-6 py-5 border-b border-slate-200 dark:border-white/10 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Preventive Mesin</h2>
-                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Hasil preventive sesuai mesin yang dipilih teknisi. Approval: Injection lalu Maintenance.</p>
-                    </div>
-                    @if (auth()->user()->seesFullDashboard())
-                        <a href="{{ route('admin.preventive.index') }}" class="text-sm font-medium text-emerald-600 hover:text-emerald-500 dark:text-emerald-400">Lihat semua →</a>
-                    @endif
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">
-                                <th class="px-4 py-3">Tanggal</th>
-                                <th class="px-4 py-3">Mesin</th>
-                                <th class="px-4 py-3">Nama Mesin</th>
-                                <th class="px-4 py-3">Kategori Preventive</th>
-                                <th class="px-4 py-3">Tipe Preventive</th>
-                                <th class="px-4 py-3">Shift</th>
-                                <th class="px-4 py-3">PIC</th>
-                                <th class="px-4 py-3">Hasil</th>
-                                <th class="px-4 py-3">Status</th>
-                                <th class="px-4 py-3">Approval</th>
-                                <th class="px-4 py-3 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-white/5">
-                            @forelse ($preventiveReports as $report)
-                                <tr class="hover:bg-slate-50 transition dark:hover:bg-white/5">
-                                    <td class="px-4 py-3 text-slate-700 whitespace-nowrap dark:text-slate-200">{{ $report->work_date->format('d/m/Y') }}</td>
-                                    <td class="px-4 py-3 text-slate-700 whitespace-nowrap dark:text-slate-200">
-                                        <a href="{{ route('admin.machines.show', $report->machine_number) }}" class="font-medium text-cyan-600 hover:text-cyan-500 dark:text-cyan-400">#{{ $report->machine_number }}</a>
-                                    </td>
-                                    <td class="px-4 py-3 text-slate-700 max-w-[180px] truncate dark:text-slate-200">{{ $report->machine_name_display }}</td>
-                                    <td class="px-4 py-3 text-slate-700 whitespace-nowrap dark:text-slate-200">{{ $report->schedule_group_label }}</td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">{{ $report->category_label }}</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap dark:text-slate-300">{{ $report->work_shift_label }}</td>
-                                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap dark:text-slate-300">{{ $report->pic_name }}</td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium {{ $report->result_badge_class }}">
-                                            {{ $report->result_label }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <x-admin.preventive-status-form :report="$report" compact />
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <x-admin.approval-progress :status="$report->status" variant="preventive" compact />
-                                    </td>
-                                    <td class="px-4 py-3 text-right whitespace-nowrap">
-                                        <div class="inline-flex items-center justify-end gap-3">
-                                            <a href="{{ route('admin.preventive.export', $report) }}" class="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-medium">Download</a>
-                                            <a href="{{ route('admin.preventive.show', $report) }}" class="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-medium">Detail →</a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="11" class="px-4 py-12 text-center text-slate-500">Belum ada hasil preventive mesin.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                @if ($preventiveReports->hasPages())
-                    <div class="p-4 border-t border-slate-200 dark:border-white/10">{{ $preventiveReports->links() }}</div>
-                @endif
-            </div>
-            @endif
-
-            @if (auth()->user()->seesDashboardOverview())
-            {{-- Log Temuan --}}
-            <div class="em-glass rounded-2xl overflow-hidden">
-                <div class="px-6 py-5 border-b border-slate-200 dark:border-white/10 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Log Temuan</h2>
-                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Temuan mesin beserta due date dan riwayat catatan status</p>
-                    </div>
-                    @if (auth()->user()->seesFullDashboard())
-                        <a href="{{ route('admin.finding-recaps.index') }}" class="text-sm font-medium text-cyan-600 hover:text-cyan-500 dark:text-cyan-400">Kelola log temuan →</a>
-                    @endif
-                </div>
-                <x-admin.finding-recap-table :recaps="$findingRecaps" :status-labels="$findingRecapStatusLabels" paginated :allow-status-change="auth()->user()->seesFullDashboard()" />
-            </div>
-            @endif
         </div>
+        @endunless
     </div>
 
     @push('scripts')
     <style>
+        .machine-running-mark {
+            position: absolute;
+            top: 0.35rem;
+            left: 0.35rem;
+            z-index: 2;
+            width: 1.75rem;
+            height: 1.75rem;
+            border: 0;
+            padding: 0;
+            background: transparent;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        span.machine-running-mark { cursor: default; }
+        .machine-running-mark.hidden { display: none !important; }
+        .machine-running-mark::after {
+            content: '';
+            width: 0.85rem;
+            height: 0.85rem;
+            border-radius: 9999px;
+            border: 2px solid #94a3b8;
+            background: transparent;
+            box-sizing: border-box;
+        }
+        .machine-running-mark.is-running::after {
+            border-color: #16a34a;
+            background: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35);
+        }
+        .machine-running-mark.is-breakdown::after {
+            border-color: #dc2626;
+            background: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35);
+        }
+        .machine-running-mark.is-standby::after {
+            border-color: #64748b;
+            background: #475569;
+            box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.35);
+        }
+        .machine-status-menu {
+            position: fixed;
+            z-index: 80;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            min-width: 11.5rem;
+            padding: 0.35rem;
+            border-radius: 0.75rem;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+        }
+        html.dark .machine-status-menu {
+            background: #0f172a;
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+        .machine-status-menu.hidden { display: none; }
+        .machine-status-menu button {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            width: 100%;
+            border: 0;
+            border-radius: 0.5rem;
+            background: transparent;
+            padding: 0.4rem 0.5rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #0f172a;
+            cursor: pointer;
+        }
+        html.dark .machine-status-menu button { color: #e2e8f0; }
+        .machine-status-menu button:hover,
+        .machine-status-menu button.is-on { background: #f1f5f9; }
+        html.dark .machine-status-menu button:hover,
+        html.dark .machine-status-menu button.is-on { background: rgba(255, 255, 255, 0.08); }
+        .machine-status-swatch {
+            width: 0.7rem;
+            height: 0.7rem;
+            border-radius: 9999px;
+            flex: 0 0 auto;
+        }
+        .machine-status-swatch.is-running { background: #22c55e; }
+        .machine-status-swatch.is-breakdown { background: #ef4444; }
+        .machine-status-swatch.is-standby { background: #475569; }
+        .machine-running-toggle { cursor: pointer; }
         .em-machine-card--active {
             border-color: #ef4444;
             background-image: linear-gradient(to bottom right, #fef2f2, #fecaca);
@@ -523,12 +554,12 @@
         .em-machine-card--pending {
             border-color: #eab308;
             background-image: linear-gradient(to bottom right, #fefce8, #fde68a);
-            animation: em-machine-pending 1.1s ease-in-out infinite;
+            animation: none;
         }
         html.dark .em-machine-card--pending {
             border-color: #facc15;
             background-image: linear-gradient(to bottom right, rgba(113, 63, 18, 0.55), rgba(133, 77, 14, 0.4));
-            animation-name: em-machine-pending-dark;
+            animation: none;
         }
         .em-machine-card--pending .em-machine-num {
             color: #854d0e;
@@ -560,7 +591,49 @@
         }
         .em-machine-pending-dot {
             background-color: #eab308;
-            animation: em-machine-pending 1.1s ease-in-out infinite;
+            animation: none;
+        }
+        .em-machine-card--approval {
+            border-color: #2563eb;
+            background-image: linear-gradient(to bottom right, #eff6ff, #bfdbfe);
+            animation: none;
+        }
+        html.dark .em-machine-card--approval {
+            border-color: #60a5fa;
+            background-image: linear-gradient(to bottom right, rgba(30, 58, 138, 0.55), rgba(29, 78, 216, 0.4));
+            animation: none;
+        }
+        .em-machine-card--approval .em-machine-num {
+            color: #1e3a8a;
+        }
+        html.dark .em-machine-card--approval .em-machine-num {
+            color: #dbeafe;
+        }
+        .em-machine-card--approval .machine-card-kicker,
+        .em-machine-card--approval .machine-card-name,
+        .em-machine-card--approval .machine-card-meta {
+            color: #1e3a8a;
+            font-weight: 600;
+        }
+        html.dark .em-machine-card--approval .machine-card-kicker,
+        html.dark .em-machine-card--approval .machine-card-name,
+        html.dark .em-machine-card--approval .machine-card-meta {
+            color: #bfdbfe;
+        }
+        .em-machine-card--approval .machine-op-count,
+        .em-machine-card--approval .machine-finding-count,
+        .em-machine-card--approval .machine-pm-due {
+            color: #172554;
+            font-weight: 700;
+        }
+        html.dark .em-machine-card--approval .machine-op-count,
+        html.dark .em-machine-card--approval .machine-finding-count,
+        html.dark .em-machine-card--approval .machine-pm-due {
+            color: #ffffff;
+        }
+        .em-machine-approval-dot {
+            background-color: #2563eb;
+            animation: none;
         }
         @keyframes em-machine-alert {
             0%, 100% {
@@ -610,16 +683,412 @@
                 background-image: linear-gradient(to bottom right, rgba(161, 98, 7, 0.7), rgba(113, 63, 18, 0.55));
             }
         }
+        @keyframes em-layout-machine-alert {
+            0%, 100% {
+                filter: drop-shadow(2px 0 0 #ef4444) drop-shadow(-2px 0 0 #ef4444) drop-shadow(0 2px 0 #ef4444) drop-shadow(0 -2px 0 #ef4444) drop-shadow(0 0 8px rgba(239, 68, 68, 0.95));
+            }
+            50% {
+                filter: drop-shadow(3px 0 0 #b91c1c) drop-shadow(-3px 0 0 #b91c1c) drop-shadow(0 3px 0 #b91c1c) drop-shadow(0 -3px 0 #b91c1c) drop-shadow(0 0 16px rgba(239, 68, 68, 1));
+            }
+        }
+        @keyframes em-layout-machine-pending {
+            0%, 100% {
+                filter: drop-shadow(0 0 1px rgba(234, 179, 8, 0.45)) drop-shadow(0 0 4px rgba(234, 179, 8, 0.35));
+            }
+            50% {
+                filter: drop-shadow(0 0 3px rgba(161, 98, 7, 0.95)) drop-shadow(0 0 14px rgba(250, 204, 21, 0.9));
+            }
+        }
         @media (prefers-reduced-motion: reduce) {
             .em-machine-card--active,
             .em-machine-card--pending,
             .em-machine-alert-dot,
-            .em-machine-pending-dot {
+            .em-machine-pending-dot,
+            #machine-layout .em-machine-card--active img,
+            #machine-layout .em-machine-card--pending img {
                 animation: none;
             }
         }
-        #dashboard-kiosk:fullscreen,
-        #dashboard-kiosk:-webkit-full-screen {
+        .em-tech-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+        .em-tech-row {
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 0.9rem;
+            padding: 0.75rem 0.85rem;
+        }
+        html.dark .em-tech-row {
+            border-color: rgba(255, 255, 255, 0.08);
+            background: rgba(15, 23, 42, 0.45);
+        }
+        .em-tech-name {
+            margin: 0;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        html.dark .em-tech-name { color: #f8fafc; }
+        .em-tech-badge {
+            display: inline-flex;
+            margin-top: 0.45rem;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.2;
+            padding: 0.22rem 0.55rem;
+        }
+        .em-tech-badge.is-idle { background: #dcfce7; color: #166534; }
+        .em-tech-badge.is-busy { background: #fee2e2; color: #991b1b; }
+        .em-tech-badge.is-off { background: #e2e8f0; color: #475569; }
+        html.dark .em-tech-badge.is-off { background: #334155; color: #cbd5e1; }
+        .em-tech-badge.is-overtime { background: #ffedd5; color: #9a3412; }
+        html.dark .em-tech-badge.is-overtime { background: rgba(154, 52, 18, 0.45); color: #fdba74; }
+        .em-tech-detail {
+            margin: 0.4rem 0 0;
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+        }
+        html.dark .em-tech-detail { color: #cbd5e1; }
+        .em-tech-shift { margin-top: 1.1rem; }
+        .em-tech-shift-title {
+            margin: 0 0 0.15rem;
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #334155;
+        }
+        html.dark .em-tech-shift-title { color: #e2e8f0; }
+        .em-tech-shift-label {
+            display: block;
+            margin-top: 0.55rem;
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748b;
+        }
+        html.dark .em-tech-shift-label { color: #94a3b8; }
+        .em-tech-shift-select {
+            display: block;
+            width: 100%;
+            margin-top: 0.25rem;
+            border-radius: 0.55rem;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 0.35rem 0.5rem;
+        }
+        html.dark .em-tech-shift-select {
+            border-color: rgba(148, 163, 184, 0.45);
+            background: #0f172a;
+            color: #f8fafc;
+        }
+        .em-tech-shift-save {
+            margin-top: 1rem;
+            border: 0;
+            border-radius: 0.7rem;
+            background: #0891b2;
+            color: #fff;
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 0.55rem 0.9rem;
+            cursor: pointer;
+        }
+        .em-tech-shift-save:hover { background: #0e7490; }
+        .em-map-switch {
+            display: inline-flex;
+            border: 1px solid #0891b2;
+            border-radius: 0.7rem;
+            overflow: hidden;
+            background: #fff;
+        }
+        .em-map-switch button {
+            border: 0;
+            background: transparent;
+            color: #0e7490;
+            font-weight: 700;
+            font-size: 0.8rem;
+            line-height: 1;
+            padding: 0.45rem 0.8rem;
+            cursor: pointer;
+        }
+        .em-map-switch button.is-on {
+            background: #0891b2;
+            color: #fff;
+        }
+        html.dark .em-map-switch {
+            background: #0f172a;
+        }
+        html.dark .em-map-switch button {
+            color: #67e8f9;
+        }
+        html.dark .em-map-switch button.is-on {
+            background: #0891b2;
+            color: #fff;
+        }
+        #machine-layout { display: none; }
+        #dashboard-map.is-layout #machine-grid { display: none !important; }
+        #dashboard-map.is-layout #machine-layout { display: block; }
+        .em-floor {
+            background: transparent;
+            overflow: visible;
+        }
+        .em-floor-top,
+        .em-floor-bottom {
+            display: grid;
+            gap: 0.75rem;
+            min-width: 1080px;
+        }
+        .em-floor-top { grid-template-columns: 15fr 14fr; }
+        .em-floor-bottom {
+            grid-template-columns: 13fr 1.6fr 14fr;
+            margin-top: 0.85rem;
+        }
+        .em-floor-extra {
+            display: grid;
+            grid-template-columns: 13fr 1.6fr 14fr;
+            gap: 0.75rem;
+            margin-top: 0.35rem;
+            min-width: 1080px;
+        }
+        .em-floor-extra-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            min-width: 0;
+        }
+        .em-cluster--compact {
+            width: max-content;
+            max-width: 100%;
+            min-width: 13.5rem;
+        }
+        .em-cluster-rename {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            width: 100%;
+            min-width: 0;
+        }
+        .em-cluster-rename input {
+            flex: 1 1 auto;
+            min-width: 0;
+            width: 100%;
+            border: 1px dashed transparent;
+            border-radius: 0.4rem;
+            background: transparent;
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.2;
+            padding: 0.15rem 0.3rem;
+        }
+        .em-cluster--compact .em-cluster-rename input {
+            min-width: 8.5rem;
+        }
+        .em-cluster-rename input:hover,
+        .em-cluster-rename input:focus {
+            border-color: #94a3b8;
+            background: #fff;
+            outline: none;
+        }
+        html.dark .em-cluster-rename input {
+            color: #f8fafc;
+        }
+        html.dark .em-cluster-rename input:hover,
+        html.dark .em-cluster-rename input:focus {
+            border-color: rgba(148, 163, 184, 0.7);
+            background: #0f172a;
+        }
+        .em-cluster-rename button {
+            flex: 0 0 auto;
+            border: 0;
+            border-radius: 999px;
+            background: #0891b2;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 1;
+            padding: 0.28rem 0.45rem;
+            cursor: pointer;
+        }
+        .em-cluster-rename button:hover { background: #0e7490; }
+        .em-cluster {
+            min-width: 0;
+            border-radius: 1rem;
+            border: 1px solid rgba(148, 163, 184, 0.38);
+            background: rgba(255, 255, 255, 0.78);
+            padding: 0.55rem 0.55rem 0.65rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }
+        html.dark .em-cluster {
+            background: rgba(15, 23, 42, 0.72);
+            border-color: rgba(255, 255, 255, 0.08);
+            box-shadow: none;
+        }
+        .em-cluster--shell { box-shadow: inset 3px 0 0 #0891b2; }
+        .em-cluster--muffler { box-shadow: inset 3px 0 0 #6366f1; }
+        .em-cluster--body { box-shadow: inset 3px 0 0 #f59e0b; }
+        .em-cluster--garnish { box-shadow: inset 3px 0 0 #10b981; }
+        html.dark .em-cluster--shell { box-shadow: inset 3px 0 0 #22d3ee; }
+        html.dark .em-cluster--muffler { box-shadow: inset 3px 0 0 #818cf8; }
+        html.dark .em-cluster--body { box-shadow: inset 3px 0 0 #fbbf24; }
+        html.dark .em-cluster--garnish { box-shadow: inset 3px 0 0 #34d399; }
+        .em-cluster-head {
+            display: flex;
+            align-items: baseline;
+            gap: 0.4rem;
+            margin: 0 0.15rem 0.5rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+        }
+        .em-cluster-kicker {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0;
+            text-transform: none;
+            color: #0f172a;
+            white-space: nowrap;
+        }
+        html.dark .em-cluster-kicker { color: #f8fafc; }
+        .em-cluster-cells { display: grid; gap: 0.15rem; overflow: visible; }
+        .em-layout-cell {
+            position: relative;
+            min-height: 0;
+            background: transparent !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            padding: 0.1rem 0.08rem 1.25rem !important;
+            box-shadow: none !important;
+            animation: none !important;
+            transform: none !important;
+            overflow: visible;
+        }
+        html.dark #machine-layout .em-layout-cell {
+            background: transparent !important;
+            border: 0 !important;
+        }
+        #machine-layout .em-machine-card--idle:hover {
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+        .em-cluster,
+        .em-cluster-cells,
+        .em-floor { overflow: visible; }
+        .em-layout-hit {
+            display: block;
+            position: relative;
+            width: 100%;
+            aspect-ratio: 488 / 1148;
+            height: auto;
+            min-height: 0;
+            text-decoration: none;
+            overflow: visible;
+        }
+        .em-layout-cell img {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 235.25%;
+            max-width: none;
+            height: auto;
+            object-fit: contain;
+            pointer-events: none;
+            transform: translate(-50%, -50%) rotate(90deg);
+            transform-origin: center center;
+        }
+        #machine-layout .em-machine-card--active img {
+            animation: em-layout-machine-alert 1.1s ease-in-out infinite;
+        }
+        #machine-layout .em-machine-card--pending img {
+            animation: none;
+            filter: drop-shadow(2px 0 0 #ca8a04) drop-shadow(-2px 0 0 #ca8a04) drop-shadow(0 2px 0 #ca8a04) drop-shadow(0 -2px 0 #ca8a04) drop-shadow(0 0 8px rgba(234, 179, 8, 0.95));
+        }
+        #machine-layout .em-machine-card--approval img {
+            animation: none;
+            filter: drop-shadow(2px 0 0 #1d4ed8) drop-shadow(-2px 0 0 #1d4ed8) drop-shadow(0 2px 0 #1d4ed8) drop-shadow(0 -2px 0 #1d4ed8) drop-shadow(0 0 8px rgba(37, 99, 235, 0.95));
+        }
+        .em-layout-no {
+            position: absolute;
+            left: 50%;
+            bottom: 0.12rem;
+            z-index: 3;
+            transform: translateX(-50%);
+            background: #0f172a;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.2;
+            border-radius: 999px;
+            padding: 0.22rem 0.48rem;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 0 0 2px #fff;
+        }
+        html.dark #machine-layout .em-layout-no {
+            background: #f8fafc;
+            color: #0f172a;
+        }
+        #machine-layout .em-machine-card--active .em-layout-no,
+        html.dark #machine-layout .em-machine-card--active .em-layout-no {
+            background: #ef4444;
+            color: #fff;
+        }
+        #machine-layout .em-machine-card--pending .em-layout-no,
+        html.dark #machine-layout .em-machine-card--pending .em-layout-no {
+            background: #eab308;
+            color: #422006;
+        }
+        #machine-layout .em-machine-card--approval .em-layout-no,
+        html.dark #machine-layout .em-machine-card--approval .em-layout-no {
+            background: #2563eb;
+            color: #fff;
+        }
+        #machine-layout .em-machine-card--active,
+        #machine-layout .em-machine-card--pending,
+        #machine-layout .em-machine-card--approval {
+            border: 0 !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            animation: none !important;
+        }
+        #machine-layout .machine-running-mark {
+            width: 1.15rem;
+            height: 1.15rem;
+            top: 0.05rem;
+            left: 0.02rem;
+            box-shadow: 0 0 0 2px #fff;
+        }
+        #machine-layout .machine-running-mark::after {
+            width: 0.55rem;
+            height: 0.55rem;
+            border-width: 2px;
+        }
+        #dashboard-kiosk:fullscreen #dashboard-map.is-layout #machine-layout,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-map.is-layout #machine-layout,
+        #dashboard-kiosk.is-fs #dashboard-map.is-layout #machine-layout,
+        html.operator-screen-fit #dashboard-map.is-layout #machine-layout {
+            display: block;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: auto;
+        }
+        #dashboard-kiosk:fullscreen #machine-layout .machine-card,
+        #dashboard-kiosk:-webkit-full-screen #machine-layout .machine-card,
+        #dashboard-kiosk.is-fs #machine-layout .machine-card,
+        html.operator-screen-fit #machine-layout .machine-card,
+        #dashboard-kiosk.operator-kiosk:fullscreen #machine-layout .machine-card,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen #machine-layout .machine-card {
+            height: auto !important;
+            min-height: 0 !important;
+            padding: 0.1rem 0.08rem 1.25rem !important;
+            overflow: visible !important;
+        }
+        #dashboard-kiosk:fullscreen, #dashboard-kiosk.is-fs,
+        #dashboard-kiosk:-webkit-full-screen, #dashboard-kiosk.is-fs {
             background-color: #f8fafc;
             width: 100%;
             height: 100%;
@@ -628,12 +1097,12 @@
             display: flex;
             flex-direction: column;
         }
-        html.dark #dashboard-kiosk:fullscreen,
-        html.dark #dashboard-kiosk:-webkit-full-screen {
+        html.dark #dashboard-kiosk:fullscreen, html.dark #dashboard-kiosk.is-fs,
+        html.dark #dashboard-kiosk:-webkit-full-screen, html.dark #dashboard-kiosk.is-fs {
             background-color: #020617;
         }
-        #dashboard-kiosk:fullscreen #dashboard-kiosk-inner,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-kiosk-inner {
+        #dashboard-kiosk:fullscreen #dashboard-kiosk-inner, #dashboard-kiosk.is-fs #dashboard-kiosk-inner,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-kiosk-inner , #dashboard-kiosk.is-fs #dashboard-kiosk-inner {
             max-width: none;
             width: 100%;
             height: 100%;
@@ -644,8 +1113,8 @@
             gap: 0.5rem;
             padding: 0.65rem 0.9rem 0.75rem;
         }
-        #dashboard-kiosk:fullscreen #dashboard-hero,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-hero {
+        #dashboard-kiosk:fullscreen #dashboard-hero, #dashboard-kiosk.is-fs #dashboard-hero,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-hero , #dashboard-kiosk.is-fs #dashboard-hero {
             order: 1;
             flex: 0 0 auto;
             flex-direction: row;
@@ -653,8 +1122,8 @@
             justify-content: space-between;
             gap: 0.75rem;
         }
-        #dashboard-kiosk:fullscreen #dashboard-charts,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-charts {
+        #dashboard-kiosk:fullscreen #dashboard-charts, #dashboard-kiosk.is-fs #dashboard-charts,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-charts , #dashboard-kiosk.is-fs #dashboard-charts {
             order: 2;
             flex: 0 0 26vh;
             max-height: 240px;
@@ -663,8 +1132,8 @@
             overflow: hidden;
             padding: 0.45rem 0.65rem;
         }
-        #dashboard-kiosk:fullscreen #dashboard-map,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-map {
+        #dashboard-kiosk:fullscreen #dashboard-map, #dashboard-kiosk.is-fs #dashboard-map,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-map , #dashboard-kiosk.is-fs #dashboard-map {
             order: 3;
             flex: 1 1 auto;
             min-height: 0;
@@ -673,79 +1142,103 @@
             flex-direction: column;
             overflow: hidden;
         }
-        #dashboard-kiosk:fullscreen #dashboard-stats,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-stats,
-        #dashboard-kiosk:fullscreen .dashboard-live-badge,
-        #dashboard-kiosk:-webkit-full-screen .dashboard-live-badge,
-        #dashboard-kiosk:fullscreen #last-updated,
-        #dashboard-kiosk:-webkit-full-screen #last-updated,
-        #dashboard-kiosk:fullscreen .dashboard-fs-hide,
-        #dashboard-kiosk:-webkit-full-screen .dashboard-fs-hide {
+        #dashboard-kiosk:fullscreen #dashboard-stats, #dashboard-kiosk.is-fs #dashboard-stats,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-stats, #dashboard-kiosk.is-fs #dashboard-stats,
+        #dashboard-kiosk:fullscreen #technician-status, #dashboard-kiosk.is-fs #technician-status,
+        #dashboard-kiosk:-webkit-full-screen #technician-status, #dashboard-kiosk.is-fs #technician-status,
+        #dashboard-kiosk:fullscreen .dashboard-live-badge, #dashboard-kiosk.is-fs .dashboard-live-badge,
+        #dashboard-kiosk:-webkit-full-screen .dashboard-live-badge, #dashboard-kiosk.is-fs .dashboard-live-badge,
+        #dashboard-kiosk:fullscreen #last-updated, #dashboard-kiosk.is-fs #last-updated,
+        #dashboard-kiosk:-webkit-full-screen #last-updated, #dashboard-kiosk.is-fs #last-updated,
+        #dashboard-kiosk:fullscreen .dashboard-fs-hide, #dashboard-kiosk.is-fs .dashboard-fs-hide,
+        #dashboard-kiosk:-webkit-full-screen .dashboard-fs-hide , #dashboard-kiosk.is-fs .dashboard-fs-hide {
             display: none !important;
         }
-        #dashboard-kiosk:fullscreen #dashboard-hero h1,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-hero h1 {
+        #dashboard-kiosk:fullscreen #dashboard-hero h1, #dashboard-kiosk.is-fs #dashboard-hero h1,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-hero h1 , #dashboard-kiosk.is-fs #dashboard-hero h1 {
             font-size: 1.35rem;
             line-height: 1.2;
         }
-        #dashboard-kiosk:fullscreen #dashboard-hero p,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-hero p {
+        #dashboard-kiosk:fullscreen #dashboard-hero p, #dashboard-kiosk.is-fs #dashboard-hero p,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-hero p , #dashboard-kiosk.is-fs #dashboard-hero p {
             margin-top: 0.15rem;
             font-size: 0.85rem;
         }
-        #dashboard-kiosk:fullscreen #dashboard-hero .em-qr-btn,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-hero .em-qr-btn {
+        #dashboard-kiosk:fullscreen #dashboard-hero .em-qr-btn, #dashboard-kiosk.is-fs #dashboard-hero .em-qr-btn,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-hero .em-qr-btn , #dashboard-kiosk.is-fs #dashboard-hero .em-qr-btn {
             min-height: 2.25rem;
             padding: 0.35rem 0.75rem;
         }
-        #dashboard-kiosk:fullscreen #dashboard-charts .grid,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-charts .grid {
+        .em-chart-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem;
+            align-items: start;
+        }
+        .em-chart-grid--full { grid-template-columns: repeat(6, minmax(0, 1fr)); min-width: 1280px; }
+        .em-chart-grid--compact { grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 860px; }
+        .em-chart-cell + .em-chart-cell {
+            border-left: 1px solid rgba(148, 163, 184, 0.25);
+            padding-left: 0.75rem;
+        }
+        #dashboard-kiosk:fullscreen #dashboard-charts .em-chart-grid, #dashboard-kiosk.is-fs #dashboard-charts .em-chart-grid,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-charts .em-chart-grid , #dashboard-kiosk.is-fs #dashboard-charts .em-chart-grid {
             gap: 0.5rem;
             height: 100%;
+            min-width: 0;
         }
-        #dashboard-kiosk:fullscreen #dashboard-charts h2,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-charts h2 {
+        #dashboard-kiosk:fullscreen #dashboard-charts .em-chart-grid--full, #dashboard-kiosk.is-fs #dashboard-charts .em-chart-grid--full,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-charts .em-chart-grid--full , #dashboard-kiosk.is-fs #dashboard-charts .em-chart-grid--full {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+        #dashboard-kiosk:fullscreen #dashboard-charts .em-chart-grid--compact, #dashboard-kiosk.is-fs #dashboard-charts .em-chart-grid--compact,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-charts .em-chart-grid--compact , #dashboard-kiosk.is-fs #dashboard-charts .em-chart-grid--compact {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        #dashboard-kiosk:fullscreen #dashboard-charts h2, #dashboard-kiosk.is-fs #dashboard-charts h2,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-charts h2 , #dashboard-kiosk.is-fs #dashboard-charts h2 {
             font-size: 0.72rem;
         }
-        #dashboard-kiosk:fullscreen #performer-period,
-        #dashboard-kiosk:-webkit-full-screen #performer-period,
-        #dashboard-kiosk:fullscreen #sla-summary,
-        #dashboard-kiosk:-webkit-full-screen #sla-summary,
-        #dashboard-kiosk:fullscreen #machine-period,
-        #dashboard-kiosk:-webkit-full-screen #machine-period {
+        #dashboard-kiosk:fullscreen #performer-period, #dashboard-kiosk.is-fs #performer-period,
+        #dashboard-kiosk:-webkit-full-screen #performer-period, #dashboard-kiosk.is-fs #performer-period,
+        #dashboard-kiosk:fullscreen #sla-summary, #dashboard-kiosk.is-fs #sla-summary,
+        #dashboard-kiosk:-webkit-full-screen #sla-summary, #dashboard-kiosk.is-fs #sla-summary,
+        #dashboard-kiosk:fullscreen #machine-period, #dashboard-kiosk.is-fs #machine-period,
+        #dashboard-kiosk:-webkit-full-screen #machine-period , #dashboard-kiosk.is-fs #machine-period,
+        #dashboard-kiosk:fullscreen #fleet-period, #dashboard-kiosk.is-fs #fleet-period,
+        #dashboard-kiosk:-webkit-full-screen #fleet-period, #dashboard-kiosk.is-fs #fleet-period {
             display: none;
         }
-        #dashboard-kiosk:fullscreen #performer-chart-wrap,
-        #dashboard-kiosk:-webkit-full-screen #performer-chart-wrap,
-        #dashboard-kiosk:fullscreen #sla-chart-wrap,
-        #dashboard-kiosk:-webkit-full-screen #sla-chart-wrap,
-        #dashboard-kiosk:fullscreen #machine-chart-wrap,
-        #dashboard-kiosk:-webkit-full-screen #machine-chart-wrap {
+        #dashboard-kiosk:fullscreen #performer-chart-wrap, #dashboard-kiosk.is-fs #performer-chart-wrap,
+        #dashboard-kiosk:-webkit-full-screen #performer-chart-wrap, #dashboard-kiosk.is-fs #performer-chart-wrap,
+        #dashboard-kiosk:fullscreen #sla-chart-wrap, #dashboard-kiosk.is-fs #sla-chart-wrap,
+        #dashboard-kiosk:-webkit-full-screen #sla-chart-wrap, #dashboard-kiosk.is-fs #sla-chart-wrap,
+        #dashboard-kiosk:fullscreen #machine-chart-wrap, #dashboard-kiosk.is-fs #machine-chart-wrap,
+        #dashboard-kiosk:-webkit-full-screen #machine-chart-wrap, #dashboard-kiosk.is-fs #machine-chart-wrap,
+        #dashboard-kiosk:fullscreen #technician-status-chart-wrap, #dashboard-kiosk.is-fs #technician-status-chart-wrap,
+        #dashboard-kiosk:-webkit-full-screen #technician-status-chart-wrap, #dashboard-kiosk.is-fs #technician-status-chart-wrap {
             height: calc(100% - 1.35rem) !important;
             min-height: 0;
         }
-        #dashboard-kiosk:fullscreen #pm-status-chart,
-        #dashboard-kiosk:-webkit-full-screen #pm-status-chart {
+        #dashboard-kiosk:fullscreen #pm-status-chart, #dashboard-kiosk.is-fs #pm-status-chart,
+        #dashboard-kiosk:-webkit-full-screen #pm-status-chart , #dashboard-kiosk.is-fs #pm-status-chart {
             max-height: 5.5rem;
         }
-        #dashboard-kiosk:fullscreen #dashboard-charts .h-28,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-charts .h-28 {
+        #dashboard-kiosk:fullscreen #dashboard-charts .h-28, #dashboard-kiosk.is-fs #dashboard-charts .h-28,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-charts .h-28 , #dashboard-kiosk.is-fs #dashboard-charts .h-28 {
             height: 5.5rem;
             width: 5.5rem;
         }
-        #dashboard-kiosk:fullscreen #dashboard-map > div:first-child,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-map > div:first-child {
+        #dashboard-kiosk:fullscreen #dashboard-map > .dashboard-map-toolbar, #dashboard-kiosk.is-fs #dashboard-map > .dashboard-map-toolbar,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-map > .dashboard-map-toolbar , #dashboard-kiosk.is-fs #dashboard-map > .dashboard-map-toolbar {
             margin-bottom: 0.4rem;
             flex: 0 0 auto;
         }
-        #dashboard-kiosk:fullscreen #dashboard-map h2,
-        #dashboard-kiosk:-webkit-full-screen #dashboard-map h2 {
+        #dashboard-kiosk:fullscreen #dashboard-map h2, #dashboard-kiosk.is-fs #dashboard-map h2,
+        #dashboard-kiosk:-webkit-full-screen #dashboard-map h2 , #dashboard-kiosk.is-fs #dashboard-map h2 {
             font-size: 0.95rem;
         }
-        #dashboard-kiosk:fullscreen #machine-grid,
-        #dashboard-kiosk:-webkit-full-screen #machine-grid {
+        #dashboard-kiosk:fullscreen #machine-grid, #dashboard-kiosk.is-fs #machine-grid,
+        #dashboard-kiosk:-webkit-full-screen #machine-grid , #dashboard-kiosk.is-fs #machine-grid {
             flex: 1 1 auto;
             min-height: 0;
             overflow: hidden;
@@ -754,16 +1247,16 @@
             grid-auto-rows: minmax(0, 1fr);
             align-content: stretch;
         }
-        #dashboard-kiosk:fullscreen .machine-card,
-        #dashboard-kiosk:-webkit-full-screen .machine-card {
+        #dashboard-kiosk:fullscreen .machine-card, #dashboard-kiosk.is-fs .machine-card,
+        #dashboard-kiosk:-webkit-full-screen .machine-card , #dashboard-kiosk.is-fs .machine-card {
             min-height: 0;
             height: 100%;
             padding: 0.28rem 0.32rem;
             transform: none !important;
             overflow: hidden;
         }
-        #dashboard-kiosk:fullscreen .machine-card-kicker,
-        #dashboard-kiosk:-webkit-full-screen .machine-card-kicker {
+        #dashboard-kiosk:fullscreen .machine-card-kicker, #dashboard-kiosk.is-fs .machine-card-kicker,
+        #dashboard-kiosk:-webkit-full-screen .machine-card-kicker , #dashboard-kiosk.is-fs .machine-card-kicker {
             display: block;
             font-size: 9px;
             font-weight: 700;
@@ -771,55 +1264,144 @@
             line-height: 1.1;
             color: #475569;
         }
-        html.dark #dashboard-kiosk:fullscreen .machine-card-kicker,
-        html.dark #dashboard-kiosk:-webkit-full-screen .machine-card-kicker {
+        html.dark #dashboard-kiosk:fullscreen .machine-card-kicker, html.dark #dashboard-kiosk.is-fs .machine-card-kicker,
+        html.dark #dashboard-kiosk:-webkit-full-screen .machine-card-kicker , html.dark #dashboard-kiosk.is-fs .machine-card-kicker {
             color: #cbd5e1;
         }
-        html.dark #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-kicker,
-        html.dark #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-kicker {
+        html.dark #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-kicker, html.dark #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-kicker,
+        html.dark #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-kicker , html.dark #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-kicker {
             color: #fecaca;
         }
-        #dashboard-kiosk:fullscreen .em-machine-num,
-        #dashboard-kiosk:-webkit-full-screen .em-machine-num {
+        #dashboard-kiosk:fullscreen .em-machine-num, #dashboard-kiosk.is-fs .em-machine-num,
+        #dashboard-kiosk:-webkit-full-screen .em-machine-num , #dashboard-kiosk.is-fs .em-machine-num {
             font-size: 1.15rem;
             margin-top: 0;
             line-height: 1.1;
         }
-        #dashboard-kiosk:fullscreen .machine-card-name,
-        #dashboard-kiosk:-webkit-full-screen .machine-card-name {
+        #dashboard-kiosk:fullscreen .machine-card-name, #dashboard-kiosk.is-fs .machine-card-name,
+        #dashboard-kiosk:-webkit-full-screen .machine-card-name , #dashboard-kiosk.is-fs .machine-card-name {
             font-size: 10px;
             font-weight: 600;
             margin-top: 0.1rem;
             color: #334155;
         }
-        #dashboard-kiosk:fullscreen .machine-card-meta,
-        #dashboard-kiosk:-webkit-full-screen .machine-card-meta {
+        #dashboard-kiosk:fullscreen .machine-card-meta, #dashboard-kiosk.is-fs .machine-card-meta,
+        #dashboard-kiosk:-webkit-full-screen .machine-card-meta , #dashboard-kiosk.is-fs .machine-card-meta {
             margin-top: 0.15rem;
             font-size: 10px;
             font-weight: 600;
             line-height: 1.2;
             color: #334155;
         }
-        #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-name,
-        #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-name,
-        #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-meta,
-        #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-meta {
+        #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-name, #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-name,
+        #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-name, #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-name,
+        #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-meta, #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-meta,
+        #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-meta , #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-meta {
             color: #7f1d1d;
         }
-        html.dark #dashboard-kiosk:fullscreen .machine-card-name,
-        html.dark #dashboard-kiosk:-webkit-full-screen .machine-card-name,
-        html.dark #dashboard-kiosk:fullscreen .machine-card-meta,
-        html.dark #dashboard-kiosk:-webkit-full-screen .machine-card-meta {
+        html.dark #dashboard-kiosk:fullscreen .machine-card-name, html.dark #dashboard-kiosk.is-fs .machine-card-name,
+        html.dark #dashboard-kiosk:-webkit-full-screen .machine-card-name, html.dark #dashboard-kiosk.is-fs .machine-card-name,
+        html.dark #dashboard-kiosk:fullscreen .machine-card-meta, html.dark #dashboard-kiosk.is-fs .machine-card-meta,
+        html.dark #dashboard-kiosk:-webkit-full-screen .machine-card-meta , html.dark #dashboard-kiosk.is-fs .machine-card-meta {
             color: #e2e8f0;
         }
-        html.dark #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-name,
-        html.dark #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-name,
-        html.dark #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-meta,
-        html.dark #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-meta {
+        html.dark #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-name, html.dark #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-name,
+        html.dark #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-name, html.dark #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-name,
+        html.dark #dashboard-kiosk:fullscreen .em-machine-card--active .machine-card-meta, html.dark #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-meta,
+        html.dark #dashboard-kiosk:-webkit-full-screen .em-machine-card--active .machine-card-meta , html.dark #dashboard-kiosk.is-fs .em-machine-card--active .machine-card-meta {
             color: #fecaca;
         }
-        #dashboard-kiosk:fullscreen .preventive-badges,
-        #dashboard-kiosk:-webkit-full-screen .preventive-badges {
+        html.operator-screen-fit,
+        html.operator-screen-fit body {
+            height: 100%;
+            overflow: hidden;
+        }
+        html.operator-screen-fit nav,
+        html.operator-screen-fit .em-site-footer {
+            display: none !important;
+        }
+        html.operator-screen-fit .min-h-screen,
+        html.operator-screen-fit .pb-16 {
+            min-height: 0 !important;
+            height: 100dvh;
+            padding-bottom: 0 !important;
+            overflow: hidden;
+        }
+        html.operator-screen-fit #dashboard-kiosk,
+        #dashboard-kiosk.operator-kiosk:fullscreen,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen {
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        html.operator-screen-fit #dashboard-kiosk-inner,
+        #dashboard-kiosk.operator-kiosk:fullscreen #dashboard-kiosk-inner,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen #dashboard-kiosk-inner {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100%;
+            max-width: none;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 0.45rem 0.7rem 0.55rem;
+        }
+        html.operator-screen-fit #dashboard-hero,
+        #dashboard-kiosk.operator-kiosk:fullscreen #dashboard-hero,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen #dashboard-hero {
+            flex: 0 0 auto;
+            gap: 0.5rem;
+        }
+        html.operator-screen-fit #dashboard-hero h1,
+        #dashboard-kiosk.operator-kiosk:fullscreen #dashboard-hero h1,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen #dashboard-hero h1 {
+            font-size: 1.2rem;
+            line-height: 1.15;
+        }
+        html.operator-screen-fit #dashboard-hero p,
+        #dashboard-kiosk.operator-kiosk:fullscreen #dashboard-hero p,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen #dashboard-hero p {
+            display: none;
+        }
+        html.operator-screen-fit #dashboard-map,
+        #dashboard-kiosk.operator-kiosk:fullscreen #dashboard-map,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen #dashboard-map {
+            flex: 1 1 auto;
+            min-height: 0;
+            margin-top: 0.35rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        html.operator-screen-fit #machine-grid,
+        #dashboard-kiosk.operator-kiosk:fullscreen #machine-grid,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen #machine-grid {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+            align-content: stretch;
+        }
+        html.operator-screen-fit .machine-card,
+        #dashboard-kiosk.operator-kiosk:fullscreen .machine-card,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen .machine-card {
+            min-height: 0 !important;
+            height: 100%;
+            overflow: hidden;
+            padding: 0.2rem 0.25rem;
+            transform: none !important;
+        }
+        html.operator-screen-fit .machine-card-meta,
+        html.operator-screen-fit .preventive-badges,
+        #dashboard-kiosk.operator-kiosk:fullscreen .machine-card-meta,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen .machine-card-meta,
+        #dashboard-kiosk.operator-kiosk:fullscreen .preventive-badges,
+        #dashboard-kiosk.operator-kiosk:-webkit-full-screen .preventive-badges {
+            display: none;
+        }
+        #dashboard-kiosk:fullscreen .preventive-badges, #dashboard-kiosk.is-fs .preventive-badges,
+        #dashboard-kiosk:-webkit-full-screen .preventive-badges , #dashboard-kiosk.is-fs .preventive-badges {
             min-height: 0;
             margin-top: 0.1rem;
         }
@@ -872,7 +1454,13 @@
         let performerChart = null;
         let slaChart = null;
         let machineChart = null;
+        let fleetChart = null;
         let pmStatusChart = null;
+        let technicianStatusChart = null;
+        @php
+            $technicianChartSeed = $technicianChartCounts ?? ['idle' => 0, 'busy' => 0, 'off' => 0, 'overtime' => 0];
+        @endphp
+        const technicianChartSeed = @json($technicianChartSeed);
 
         if (fullDashboard && typeof Chart !== 'undefined') {
         const isDark = () => document.documentElement.classList.contains('dark');
@@ -897,6 +1485,31 @@
                 y: { ticks: { font: { size: 10 }, precision: 0, color: tickColor() }, grid: { color: gridColor() } },
             },
         };
+
+        if (document.getElementById('technician-status-chart')) {
+        technicianStatusChart = new Chart(document.getElementById('technician-status-chart'), {
+            type: 'bar',
+            data: {
+                labels: ['Standby / Available', 'On Job / Assigned', 'Off-duty', 'Overtime'],
+                datasets: [{
+                    label: 'Teknisi',
+                    data: [technicianChartSeed.idle || 0, technicianChartSeed.busy || 0, technicianChartSeed.off || 0, technicianChartSeed.overtime || 0],
+                    backgroundColor: ['#22c55e', '#ef4444', '#64748b', '#f97316'],
+                    borderRadius: 4,
+                }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 }, color: tickColor() }, grid: { color: gridColor() } },
+                    y: { ticks: { font: { size: 9 }, color: tickColor() }, grid: { display: false } },
+                },
+            },
+        });
+        }
 
         if (document.getElementById('performer-chart')) {
         performerChart = new Chart(document.getElementById('performer-chart'), {
@@ -964,6 +1577,32 @@
             },
         });
 
+        if (document.getElementById('fleet-chart')) {
+        const fleet = chartsData.machine_status || { labels: [], values: [], colors: [] };
+        fleetChart = new Chart(document.getElementById('fleet-chart'), {
+            type: 'bar',
+            data: {
+                labels: fleet.labels,
+                datasets: [{
+                    label: 'Mesin',
+                    data: fleet.values,
+                    backgroundColor: fleet.colors,
+                    borderRadius: 4,
+                }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 }, color: tickColor() }, grid: { color: gridColor() } },
+                    y: { ticks: { font: { size: 9 }, color: tickColor() }, grid: { display: false } },
+                },
+            },
+        });
+        }
+
         pmStatusChart = new Chart(document.getElementById('pm-status-chart'), {
             type: 'doughnut',
             data: {
@@ -990,6 +1629,15 @@
                 },
             },
         });
+        }
+
+        function technicianChartValues(rows) {
+            const counts = { idle: 0, busy: 0, off: 0, overtime: 0 };
+            (rows || []).forEach((row) => {
+                const state = counts[row.state] === undefined ? 'idle' : row.state;
+                counts[state] += 1;
+            });
+            return [counts.idle, counts.busy, counts.off, counts.overtime];
         }
 
         function pmDonutValues(status) {
@@ -1063,6 +1711,12 @@
             }
             toggleChart('machine-chart-wrap', 'machine-chart-empty', machineHasData);
             applyChart(machineChart, data.machines.labels, [data.machines.values]);
+            if (fleetChart && data.machine_status) {
+                fleetChart.data.labels = data.machine_status.labels;
+                fleetChart.data.datasets[0].data = data.machine_status.values;
+                fleetChart.data.datasets[0].backgroundColor = data.machine_status.colors;
+                fleetChart.update('none');
+            }
 
             if (slaSummaryEl && data.period_label) {
                 const avg = data.technician_mttr.avg_minutes === null ? '' : ' · avg ' + data.technician_mttr.avg_minutes + ' mnt';
@@ -1091,7 +1745,7 @@
 
         function machineStat(stat) {
             if (stat && typeof stat === 'object' && !Array.isArray(stat)) {
-                const alert = stat.alert === 'active' || stat.alert === 'pending' ? stat.alert : 'idle';
+                const alert = stat.alert === 'active' || stat.alert === 'pending' || stat.alert === 'approval' ? stat.alert : 'idle';
                 return {
                     op: Number(stat.op || 0),
                     findings: Number(stat.findings || 0),
@@ -1112,12 +1766,13 @@
             if (findingEl) findingEl.textContent = String(parsed.findings);
             if (pmEl) pmEl.textContent = parsed.pm_due ? parsed.pm_due : '—';
             card.dataset.alert = parsed.alert;
-            card.classList.remove('em-machine-card--idle', 'em-machine-card--active', 'em-machine-card--pending');
-            card.classList.add(
-                parsed.alert === 'active'
-                    ? 'em-machine-card--active'
-                    : (parsed.alert === 'pending' ? 'em-machine-card--pending' : 'em-machine-card--idle')
-            );
+            card.classList.remove('em-machine-card--idle', 'em-machine-card--active', 'em-machine-card--pending', 'em-machine-card--approval');
+            const alertClass = {
+                active: 'em-machine-card--active',
+                pending: 'em-machine-card--pending',
+                approval: 'em-machine-card--approval',
+            }[parsed.alert] || 'em-machine-card--idle';
+            card.classList.add(alertClass);
         }
 
         async function refreshStats() {
@@ -1148,29 +1803,80 @@
                 if (data.charts) {
                     applyCharts(data.charts);
                 }
+                applyRunningMarks(data.running || [], data.breakdown || [], data.standby || []);
                 if (data.pm_status) {
                     applyPmStatus(data.pm_status);
+                }
+                if (technicianStatusChart && Array.isArray(data.technicians)) {
+                    technicianStatusChart.data.datasets[0].data = technicianChartValues(data.technicians);
+                    technicianStatusChart.update('none');
                 }
             } catch (e) {
                 console.error('Gagal memuat statistik', e);
             }
         }
 
-        refreshStats();
-        setInterval(refreshStats, 5000);
+        if (lastUpdatedEl && totalReportsEl) {
+            refreshStats();
+            setInterval(refreshStats, 5000);
+        }
+
+        @if (auth()->user()->isOperator())
+        async function refreshOperatorRunning() {
+            try {
+                const response = await fetch(@json(route('operator.running')), {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    cache: 'no-store',
+                });
+                if (!response.ok) return;
+                const data = await response.json();
+                applyRunningMarks(data.running || [], data.breakdown || [], data.standby || []);
+                if (data.machines) {
+                    document.querySelectorAll('.machine-card').forEach((card) => {
+                        const num = card.dataset.machine;
+                        const stat = data.machines[num] ?? data.machines[Number(num)] ?? { op: 0, findings: 0, pm_due: null, alert: 'idle' };
+                        applyCardState(card, stat);
+                    });
+                }
+            } catch (e) {
+                console.error('Gagal memuat status running', e);
+            }
+        }
+        refreshOperatorRunning();
+        setInterval(refreshOperatorRunning, 5000);
+        @endif
         document.getElementById('pm-year')?.addEventListener('change', refreshStats);
         document.getElementById('pm-month')?.addEventListener('change', refreshStats);
 
         const kiosk = document.getElementById('dashboard-kiosk');
         const fullscreenBtn = document.getElementById('dashboard-fullscreen-btn');
         const fullscreenLabel = fullscreenBtn?.querySelector('[data-fullscreen-label]');
+        const operatorKiosk = @json(auth()->user()->isOperator());
 
         function fullscreenElement() {
             return document.fullscreenElement || document.webkitFullscreenElement || null;
         }
 
+        function browserLooksFullscreen() {
+            return window.innerHeight >= screen.availHeight - 8;
+        }
+
+        function syncOperatorScreenFit() {
+            if (!operatorKiosk) {
+                return;
+            }
+            const on = browserLooksFullscreen() && fullscreenElement() !== kiosk;
+            document.documentElement.classList.toggle('operator-screen-fit', on);
+        }
+
+        function kioskIsFitted() {
+            return fullscreenElement() === kiosk
+                || (kiosk && kiosk.classList.contains('is-fs'))
+                || document.documentElement.classList.contains('operator-screen-fit');
+        }
+
         function resizeDashboardCharts() {
-            [performerChart, slaChart, machineChart, pmStatusChart].forEach((chart) => {
+            [performerChart, slaChart, machineChart, fleetChart, pmStatusChart].forEach((chart) => {
                 if (chart) {
                     chart.resize();
                 }
@@ -1182,7 +1888,7 @@
             if (!grid) {
                 return;
             }
-            const on = fullscreenElement() === kiosk;
+            const on = kioskIsFitted();
             if (!on) {
                 grid.style.gridTemplateColumns = '';
                 grid.style.gridTemplateRows = '';
@@ -1197,22 +1903,41 @@
             if (width < 80 || height < 80) {
                 return;
             }
-            let cols = Math.max(8, Math.min(14, Math.round(Math.sqrt(count * (width / Math.max(height, 1))))));
+            const maxCols = operatorKiosk ? 20 : 16;
+            let cols = Math.max(8, Math.min(maxCols, Math.round(Math.sqrt(count * (width / Math.max(height, 1))))));
             let rows = Math.ceil(count / cols);
-            while (rows > 5 && cols < 16) {
+            while (rows > 5 && cols < maxCols) {
                 cols += 1;
                 rows = Math.ceil(count / cols);
             }
-            if (height / rows < 68 && cols < 16) {
-                cols = Math.min(16, cols + 1);
+            while (height / rows < 56 && cols < maxCols) {
+                cols += 1;
                 rows = Math.ceil(count / cols);
             }
             grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
             grid.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
         }
 
+        function syncF11Flag() {
+            try {
+                if (window.frameElement) {
+                    return;
+                }
+                if (browserLooksFullscreen() && fullscreenElement() !== kiosk && !document.getElementById('em-fs-shell')) {
+                    sessionStorage.setItem('em-fs-f11', '1');
+                } else if (!browserLooksFullscreen()) {
+                    sessionStorage.removeItem('em-fs-f11');
+                }
+            } catch (e) {}
+        }
+
         function syncFullscreenLayout() {
-            const on = fullscreenElement() === kiosk;
+            syncOperatorScreenFit();
+            syncF11Flag();
+            if (kiosk && document.documentElement.classList.contains('em-fs-persist')) {
+                kiosk.classList.add('is-fs');
+            }
+            const on = fullscreenElement() === kiosk || document.documentElement.classList.contains('em-fs-persist');
             if (fullscreenLabel) {
                 fullscreenLabel.textContent = on ? 'Keluar' : 'Fullscreen';
             }
@@ -1232,23 +1957,11 @@
         }
 
         async function toggleDashboardFullscreen() {
-            if (!kiosk) {
+            if (!kiosk || typeof window.emEnterFullscreenShell !== 'function') {
                 return;
             }
             try {
-                if (fullscreenElement()) {
-                    if (document.exitFullscreen) {
-                        await document.exitFullscreen();
-                    } else if (document.webkitExitFullscreen) {
-                        document.webkitExitFullscreen();
-                    }
-                    return;
-                }
-                if (kiosk.requestFullscreen) {
-                    await kiosk.requestFullscreen();
-                } else if (kiosk.webkitRequestFullscreen) {
-                    kiosk.webkitRequestFullscreen();
-                }
+                window.emEnterFullscreenShell();
             } catch (e) {
                 console.error('Gagal mengubah fullscreen', e);
             }
@@ -1258,10 +1971,182 @@
         document.addEventListener('fullscreenchange', syncFullscreenLayout);
         document.addEventListener('webkitfullscreenchange', syncFullscreenLayout);
         window.addEventListener('resize', () => {
-            if (fullscreenElement() === kiosk) {
+            syncOperatorScreenFit();
+            syncF11Flag();
+            if (kioskIsFitted() || document.documentElement.classList.contains('em-fs-persist')) {
                 syncFullscreenLayout();
             }
         });
+        syncOperatorScreenFit();
+        if (kioskIsFitted() || document.documentElement.classList.contains('em-fs-persist')) {
+            syncFullscreenLayout();
+        }
+
+        function applyRunningMarks(numbers, breakdownNumbers, standbyNumbers) {
+            const running = new Set((numbers || []).map((number) => String(number)));
+            const breakdown = new Set((breakdownNumbers || []).map((number) => String(number)));
+            const standby = new Set((standbyNumbers || []).map((number) => String(number)));
+            document.querySelectorAll('.machine-running-mark').forEach((mark) => {
+                const machine = String(mark.dataset.machine);
+                const status = breakdown.has(machine) ? 'breakdown' : (running.has(machine) ? 'running' : (standby.has(machine) ? 'standby' : ''));
+                paintMachineMark(mark, status);
+            });
+            syncMachineStatusMenu();
+        }
+
+        function paintMachineMark(mark, status) {
+            mark.classList.toggle('is-running', status === 'running');
+            mark.classList.toggle('is-breakdown', status === 'breakdown');
+            mark.classList.toggle('is-standby', status === 'standby');
+            mark.dataset.status = status;
+            const title = status === 'running'
+                ? 'Hijau (Running)'
+                : (status === 'breakdown' ? 'Merah (Breakdown)' : (status === 'standby' ? 'Standby' : (mark.tagName === 'BUTTON' ? 'Pilih Hijau (Running), Merah (Breakdown), atau Standby' : 'Mesin standby')));
+            mark.title = title;
+            if (mark.tagName === 'BUTTON') {
+                mark.setAttribute('aria-pressed', status === '' ? 'false' : 'true');
+            } else {
+                mark.classList.toggle('hidden', status === '');
+            }
+        }
+
+        const machineStatusMenu = document.getElementById('machine-status-menu');
+        let machineStatusTarget = '';
+
+        function syncMachineStatusMenu() {
+            if (!machineStatusMenu || machineStatusMenu.classList.contains('hidden') || machineStatusTarget === '') {
+                return;
+            }
+            const current = document.querySelector('button.machine-running-mark[data-machine="' + machineStatusTarget + '"]')?.dataset.status || '';
+            machineStatusMenu.querySelectorAll('button').forEach((item) => {
+                item.classList.toggle('is-on', item.dataset.status === current);
+            });
+        }
+
+        function closeMachineStatusMenu() {
+            machineStatusTarget = '';
+            machineStatusMenu?.classList.add('hidden');
+        }
+
+        function openMachineStatusMenu(button) {
+            if (!machineStatusMenu) {
+                return;
+            }
+            machineStatusTarget = String(button.dataset.machine || '');
+            const rect = button.getBoundingClientRect();
+            machineStatusMenu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 196)) + 'px';
+            machineStatusMenu.style.top = Math.min(rect.bottom + 6, window.innerHeight - 132) + 'px';
+            machineStatusMenu.classList.remove('hidden');
+            syncMachineStatusMenu();
+        }
+
+        document.querySelectorAll('button.machine-running-mark').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                openMachineStatusMenu(button);
+            });
+        });
+
+        machineStatusMenu?.querySelectorAll('button').forEach((item) => {
+            item.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const current = document.querySelector('button.machine-running-mark[data-machine="' + machineStatusTarget + '"]')?.dataset.status || '';
+                const next = current === item.dataset.status ? 'off' : item.dataset.status;
+                saveMachineStatus(machineStatusTarget, next);
+            });
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!machineStatusMenu || machineStatusMenu.classList.contains('hidden')) {
+                return;
+            }
+            if (event.target.closest('#machine-status-menu, button.machine-running-mark')) {
+                return;
+            }
+            closeMachineStatusMenu();
+        });
+
+        document.querySelectorAll('.machine-running-toggle').forEach((card) => {
+            let clickTimer = null;
+
+            card.addEventListener('click', (event) => {
+                if (event.target.closest('a, button, #machine-status-menu')) {
+                    return;
+                }
+                event.preventDefault();
+                if (clickTimer) {
+                    clearTimeout(clickTimer);
+                    clickTimer = null;
+                    if (card.dataset.href) {
+                        window.location.href = card.dataset.href;
+                    }
+                    return;
+                }
+                clickTimer = setTimeout(() => {
+                    clickTimer = null;
+                }, 280);
+            });
+        });
+
+        async function saveMachineStatus(machineNumber, status) {
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const body = new FormData();
+            body.append('machine_number', machineNumber);
+            body.append('status', status);
+            try {
+                const response = await fetch(@json(route('admin.machines.running')), {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body,
+                });
+                if (!response.ok) {
+                    return;
+                }
+                const data = await response.json();
+                const saved = data.status || '';
+                document.querySelectorAll('.machine-running-mark').forEach((mark) => {
+                    if (String(mark.dataset.machine) !== String(machineNumber)) {
+                        return;
+                    }
+                    paintMachineMark(mark, saved);
+                });
+                syncMachineStatusMenu();
+            } catch (error) {
+                console.error('Gagal menyimpan status mesin', error);
+            }
+        }
+
+        const machineMap = document.getElementById('dashboard-map');
+        document.querySelectorAll('[data-map-view]').forEach((button) => {
+            button.addEventListener('click', () => setMachineMapView(button.dataset.mapView));
+        });
+        function setMachineMapView(view) {
+            if (!machineMap) {
+                return;
+            }
+            const layout = view === 'layout';
+            machineMap.classList.toggle('is-layout', layout);
+            document.querySelectorAll('[data-map-view]').forEach((button) => {
+                button.classList.toggle('is-on', button.dataset.mapView === (layout ? 'layout' : 'cards'));
+            });
+            try {
+                localStorage.setItem('em-map-view', layout ? 'layout' : 'cards');
+            } catch (e) {}
+            if (!layout) {
+                fitKioskMapGrid();
+            }
+        }
+        try {
+            if (!operatorKiosk && localStorage.getItem('em-map-view') === 'layout') {
+                setMachineMapView('layout');
+            }
+        } catch (e) {}
     </script>
     @endpush
 </x-app-layout>

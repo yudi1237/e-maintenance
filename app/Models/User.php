@@ -21,7 +21,11 @@ class User extends Authenticatable
 
     public const ROLE_MANAGEMENT = 'management';
 
+    public const ROLE_PPIC = 'ppic';
+
     public const ROLE_TECHNICIAN = 'technician';
+
+    public const ROLE_OPERATOR = 'operator';
 
     protected $fillable = [
         'name',
@@ -33,6 +37,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     protected function casts(): array
@@ -40,7 +46,24 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        return filled($this->two_factor_secret) && $this->two_factor_confirmed_at !== null;
+    }
+
+    public function resetTwoFactorAuthentication(): void
+    {
+        $this->forceFill([
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => null,
+        ])->save();
     }
 
     /** @return array<string, string> */
@@ -48,9 +71,11 @@ class User extends Authenticatable
     {
         return [
             self::ROLE_TECHNICIAN => 'Teknisi Maintenance (Login /home)',
+            self::ROLE_OPERATOR => 'Operator',
             self::ROLE_PRODUKSI_INJECTION => 'Produksi Injection',
             self::ROLE_QUALITY => 'Quality',
             self::ROLE_MANAGEMENT => 'Management View Dashboard',
+            self::ROLE_PPIC => 'PPIC',
             self::ROLE_ADMIN => 'Admin Maintenance',
         ];
     }
@@ -63,6 +88,7 @@ class User extends Authenticatable
             self::ROLE_QUALITY,
             self::ROLE_PRODUKSI_INJECTION,
             self::ROLE_MANAGEMENT,
+            self::ROLE_PPIC,
         ];
     }
 
@@ -122,6 +148,30 @@ class User extends Authenticatable
         return $this->role === self::ROLE_MANAGEMENT;
     }
 
+    public function isPpic(): bool
+    {
+        return $this->role === self::ROLE_PPIC;
+    }
+
+    public function isOperator(): bool
+    {
+        return $this->role === self::ROLE_OPERATOR;
+    }
+
+    public function homeRouteName(): string
+    {
+        return match (true) {
+            $this->isOperator() => 'operator.home',
+            $this->canAccessAdmin() => 'admin.dashboard',
+            default => 'home',
+        };
+    }
+
+    public function seesMachineMap(): bool
+    {
+        return $this->seesDashboardOverview() || $this->isPpic() || $this->isOperator();
+    }
+
     public function canAccessAdmin(): bool
     {
         return in_array($this->role, self::adminAccessRoles(), true);
@@ -132,14 +182,39 @@ class User extends Authenticatable
         return $this->isAdmin();
     }
 
+    public function seesAdminDashboard(): bool
+    {
+        return $this->isAdmin() || $this->isProduksiInjection();
+    }
+
+    public function seesTechnicianCharts(): bool
+    {
+        return $this->isAdmin();
+    }
+
+    public function canToggleMachineRunning(): bool
+    {
+        return $this->isProduksiInjection();
+    }
+
+    public function seesMachineApprovalColor(): bool
+    {
+        return $this->isAdmin() || $this->isProduksiInjection() || $this->isQuality();
+    }
+
     public function seesDashboardOverview(): bool
     {
-        return $this->isAdmin() || $this->isManagement();
+        return $this->isAdmin() || $this->isProduksiInjection() || $this->isManagement() || $this->isPpic();
     }
 
     public function seesPreventiveResults(): bool
     {
-        return $this->isAdmin() || $this->isProduksiInjection() || $this->isManagement();
+        return $this->isAdmin() || $this->isProduksiInjection() || $this->isQuality() || $this->isManagement() || $this->isPpic();
+    }
+
+    public function canOpenPreventiveBoard(): bool
+    {
+        return $this->isAdmin() || $this->isQuality();
     }
 
     public function roleLabel(): string
@@ -154,6 +229,8 @@ class User extends Authenticatable
             self::ROLE_QUALITY => 'bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200',
             self::ROLE_PRODUKSI_INJECTION => 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200',
             self::ROLE_MANAGEMENT => 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200',
+            self::ROLE_PPIC => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+            self::ROLE_OPERATOR => 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
             default => 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
         };
     }

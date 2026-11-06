@@ -36,4 +36,23 @@ class WorkShift
 
         return self::SHIFT_3;
     }
+
+    public static function currentNumber(?Carbon $time = null): int
+    {
+        return match (self::detect($time)) {
+            self::SHIFT_1 => 1,
+            self::SHIFT_2 => 2,
+            default => 3,
+        };
+    }
+
+    public static function nextNumber(int $shift): int
+    {
+        return $shift === 3 ? 1 : $shift + 1;
+    }
+
+    public static function previousNumber(int $shift): int
+    {
+        return $shift === 1 ? 3 : $shift - 1;
+    }
 }

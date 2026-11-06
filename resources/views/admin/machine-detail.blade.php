@@ -27,6 +27,30 @@
             @endif
         </div>
 
+        @if (auth()->user()->isProduksiInjection())
+            <form method="POST" action="{{ route('admin.machines.mold', $machineNumber) }}" class="em-glass mb-6 rounded-2xl p-6">
+                @csrf
+                <label for="mold_id" class="em-label">Mold terpasang</label>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Pilih mold yang sedang dipasang di Mesin {{ $machineNumber }}. Nama mold akan tampil di kartu mesin pada dashboard.</p>
+                <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <select id="mold_id" name="mold_id" class="em-input sm:max-w-xl" onchange="this.form.submit()">
+                        <option value="">Belum ada mold</option>
+                        @foreach ($molds as $mold)
+                            <option value="{{ $mold->id }}" @selected((int) $machine?->mold_id === (int) $mold->id)>{{ $mold->optionLabel() }}</option>
+                        @endforeach
+                        @if ($machine?->mold && ! $molds->contains('id', $machine->mold_id))
+                            <option value="{{ $machine->mold_id }}" selected>{{ $machine->mold->optionLabel() }}</option>
+                        @endif
+                    </select>
+                </div>
+                <x-input-error :messages="$errors->get('mold_id')" class="mt-2" />
+            </form>
+        @elseif ($machine?->mold)
+            <div class="em-glass mb-6 rounded-2xl px-6 py-4 text-sm text-slate-700 dark:text-slate-200">
+                Mold terpasang: <span class="font-semibold">{{ $machine->mold->optionLabel() }}</span>
+            </div>
+        @endif
+
         @include('partials.machine-specs', ['machine' => $machine, 'machineNumber' => $machineNumber])
 
         <form method="GET" action="{{ route('admin.machines.show', $machineNumber) }}" class="em-glass mb-6 rounded-2xl p-6">
@@ -76,6 +100,23 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-white/5">
+                        @foreach ($operatorTickets as $ticket)
+                            <tr class="hover:bg-slate-50 transition dark:hover:bg-white/5">
+                                <td class="px-4 py-3 text-slate-700 whitespace-nowrap dark:text-slate-200">{{ $ticket->stop_date?->format('d/m/Y') }}</td>
+                                <td class="px-4 py-3 text-slate-600 max-w-[220px] whitespace-pre-wrap break-words dark:text-slate-300">{{ $ticket->problem }}</td>
+                                <td class="px-4 py-3 text-slate-400">—</td>
+                                <td class="px-4 py-3 text-slate-400">—</td>
+                                <td class="px-4 py-3 text-slate-400">—</td>
+                                <td class="px-4 py-3 text-slate-400">—</td>
+                                <td class="px-4 py-3 text-slate-600 whitespace-nowrap dark:text-slate-300">{{ $ticket->pic_name }}</td>
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center rounded-lg border px-2.5 py-1.5 text-xs font-semibold {{ $ticket->status_badge_class }}">{{ $ticket->status_label }}</span>
+                                </td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap">
+                                    <a href="{{ route('admin.operator-reports.show', $ticket) }}" class="text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 dark:hover:text-cyan-300 text-xs font-medium">Detail →</a>
+                                </td>
+                            </tr>
+                        @endforeach
                         @forelse ($reports as $report)
                             <tr class="hover:bg-slate-50 transition dark:hover:bg-white/5">
                                 <td class="px-4 py-3 text-slate-700 whitespace-nowrap dark:text-slate-200">{{ $report->report_date->format('d/m/Y') }}</td>
@@ -102,9 +143,11 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr>
-                                <td colspan="8" class="px-4 py-12 text-center text-slate-500">Tidak ada laporan untuk periode yang dipilih.</td>
-                            </tr>
+                            @if ($operatorTickets->isEmpty())
+                                <tr>
+                                    <td colspan="9" class="px-4 py-12 text-center text-slate-500">Tidak ada laporan untuk periode yang dipilih.</td>
+                                </tr>
+                            @endif
                         @endforelse
                     </tbody>
                 </table>
@@ -157,7 +200,7 @@
                                 </td>
                                 <td class="px-4 py-3 text-right whitespace-nowrap">
                                     <div class="inline-flex items-center justify-end gap-3">
-                                        <a href="{{ route('admin.preventive.export', $report) }}" class="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-medium">Download</a>
+                                        <a href="{{ route('admin.preventive.export', $report) }}" class="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-medium">Download PDF</a>
                                         <a href="{{ route('admin.preventive.show', $report) }}" class="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 dark:hover:text-emerald-300 text-xs font-medium">Detail →</a>
                                     </div>
                                 </td>
