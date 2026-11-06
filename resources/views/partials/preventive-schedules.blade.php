@@ -4,16 +4,7 @@
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Jadwal dari admin. Ambil pekerjaan: buka form sesuai mesin dan tipe preventive.</p>
     </div>
     <div class="w-full overflow-x-auto">
-        <table class="w-full table-fixed text-sm">
-            <colgroup>
-                <col class="w-[8%]">
-                <col class="w-[22%]">
-                <col class="w-[14%]">
-                <col class="w-[14%]">
-                <col class="w-[16%]">
-                <col class="w-[12%]">
-                <col class="w-[14%]">
-            </colgroup>
+        <table class="w-full min-w-[920px] text-sm">
             <thead>
                 <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
                     <th class="px-3 py-3 sm:px-4">No</th>

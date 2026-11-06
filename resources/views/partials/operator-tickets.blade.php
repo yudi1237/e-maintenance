@@ -3,17 +3,7 @@
         <h2 class="text-base font-semibold text-slate-900 dark:text-white">OP Mesin</h2>
     </div>
     <div class="w-full overflow-x-auto">
-        <table class="w-full table-fixed text-sm">
-            <colgroup>
-                <col class="w-[7%]">
-                <col class="w-[15%]">
-                <col class="w-[13%]">
-                <col class="w-[13%]">
-                <col class="w-[13%]">
-                <col class="w-[15%]">
-                <col class="w-[11%]">
-                <col class="w-[14%]">
-            </colgroup>
+        <table class="w-full min-w-[920px] text-sm">
             <thead>
                 <tr class="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
                     <th class="px-3 py-3 sm:px-4">Tiket</th>

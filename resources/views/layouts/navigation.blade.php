@@ -252,5 +252,15 @@
                 >{{ \App\Support\PreventiveCategory::hubTitle() }}</x-responsive-nav-link>
             @endif
         </div>
+
+        <div class="border-t border-slate-200 px-4 py-3 dark:border-slate-700">
+            <div class="px-3 pb-2 text-sm font-medium text-slate-800 dark:text-slate-200">{{ Auth::user()->name }}</div>
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="block w-full rounded-lg px-3 py-2 text-start text-base font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10">
+                    Keluar
+                </button>
+            </form>
+        </div>
     </div>
 </nav>
